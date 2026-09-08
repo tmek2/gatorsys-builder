@@ -48,10 +48,9 @@ import {
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { SiteNav } from "@/gator/site-nav";
-import { Blob, useBlob } from "@/gator/blob";
 import { DiscordSurface } from "@/discord/surface";
 import { avatarUrl } from "@/lib/avatars";
-import { PHONE_WIDTH, blankProject, newMessage, newUser, reid, uid } from "@/lib/model";
+import { PHONE_WIDTH, blankProject, newAttachment, newMessage, newUser, reid, uid } from "@/lib/model";
 import { nextStamp, restamp } from "@/lib/clock";
 import { TEMPLATES } from "@/lib/templates";
 import { SUPPORT_URL } from "@/lib/site";
@@ -356,6 +355,14 @@ export function Builder({ user, canSignIn = true, shared = null }) {
         commit((p) => ({ ...p, canvas: { ...p.canvas, channel: { ...p.canvas.channel, name } } }), "channel:name"),
       topic: (topic) =>
         commit((p) => ({ ...p, canvas: { ...p.canvas, channel: { ...p.canvas.channel, topic } } }), "channel:topic"),
+      reorder: (from, to) =>
+        commit((p) => {
+          if (from === to || from < 0 || to < 0 || from >= p.messages.length || to >= p.messages.length) return p;
+          const messages = [...p.messages];
+          const [held] = messages.splice(from, 1);
+          messages.splice(to, 0, held);
+          return { ...p, messages };
+        }),
       move: (id, by) =>
         commit((p) => {
           const i = p.messages.findIndex((m) => m.id === id);
@@ -393,6 +400,8 @@ export function Builder({ user, canSignIn = true, shared = null }) {
   /* Whether the drawer over the canvas is showing. Picking a tool opens it on
      that tab; pressing the tool that is already showing closes it again, which
      is the behaviour of every dock somebody has used before. */
+  /* Which member the members sheet should open on. */
+  const [focusUser, setFocusUser] = useState(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [trayOpen, setTrayOpen] = useState(false);
   const dock = useRef(null);
@@ -472,6 +481,30 @@ export function Builder({ user, canSignIn = true, shared = null }) {
       setSheetOpen(null);
     },
     [commit, message, project.messages, project.users, sendAs],
+  );
+
+  /* The composer's own buttons, each doing the thing it draws. They all opened
+     the same panel before, which made four buttons that were one button in
+     four costumes. Each adds its thing to the selected message and opens the
+     tray on it, so you can see what landed and change it. */
+  const addToMessage = useCallback(
+    (what) => {
+      if (!message) return;
+      if (what === "attachment") {
+        patchMessage({
+          attachments: [...(message.attachments ?? []), newAttachment({ kind: "image" })],
+        });
+      } else if (what === "gif") {
+        patchMessage({
+          attachments: [...(message.attachments ?? []), newAttachment({ kind: "image", name: "tenor.gif" })],
+        });
+      } else if (what === "sticker") {
+        patchMessage({ sticker: message.sticker ?? { name: "Sticker", src: "" } });
+      }
+      setPanelOpen(false);
+      setTrayOpen(true);
+    },
+    [message, patchMessage],
   );
 
   const addMessage = useCallback(() => {
@@ -559,7 +592,11 @@ export function Builder({ user, canSignIn = true, shared = null }) {
      is left alone. */
   const setChrome = useCallback(
     (chrome) => {
-      const floor = chrome === "full" ? 1180 : chrome === "chat" ? 640 : 0;
+      /* A desktop client is a window, not a column. At 720 the full chrome —
+         72px of server rail, 240 of channels, 240 of members — left the
+         conversation about 170px wide, which reads as a tablet held sideways
+         rather than as Discord on a computer. */
+      const floor = chrome === "full" ? 1280 : chrome === "chat" ? 860 : 0;
       commit((p) => ({
         ...p,
         canvas: { ...p.canvas, chrome, width: Math.max(p.canvas.width, floor) },
@@ -675,7 +712,6 @@ export function Builder({ user, canSignIn = true, shared = null }) {
   /* The same travelling indicator the site's header has, twice: on the rail
      and on the tabs. One shape moving reads as one control; five backgrounds
      fading in and out read as five. */
-  const tabBlob = useBlob(tab);
 
   /* --------------------------------------------------------- shortcuts */
 
@@ -928,6 +964,7 @@ export function Builder({ user, canSignIn = true, shared = null }) {
                   onSelect={pickOnCanvas}
                   innerRef={stage}
                   edit={edit}
+                  scroller={scroller}
                 />
               </div>
             </div>
@@ -944,9 +981,18 @@ export function Builder({ user, canSignIn = true, shared = null }) {
               setSendAs(id);
               if (message) patchMessage({ user: id });
             }}
-            onEditAuthor={() => setSheetOpen("members")}
+            onEditAuthor={(id) => {
+              /* The button says "Edit Gator", so it has to open Gator — it
+                 opened the members list with whoever happened to be first
+                 expanded, which is how you press edit on one person and get
+                 another. */
+              setFocusUser(id ?? author?.id ?? null);
+              setSheetOpen("members");
+            }}
             onAddAuthor={addUser}
             onSend={sendMessage}
+            onAdd={addToMessage}
+            emojis={project.emojis}
             onTool={(id) => {
               if (id === "Extras") {
                 setPanelOpen(false);
@@ -1061,17 +1107,25 @@ export function Builder({ user, canSignIn = true, shared = null }) {
                   </button>
                 </Hint>
               </header>
+              {/* Everything about this message that is not its words: what it
+                  is, how it is drawn, what it carries, and the payload it adds
+                  up to. All of it in one board, because "where do I turn on
+                  the pinned flag" and "where do I add a reaction" are the same
+                  question asked twice. */}
               <div className="c-tray-body">
-                <Inspector
-                  tab="Extras"
-                  message={message}
-                  project={project}
-                  commit={commit}
-                  patch={patchMessage}
-                  onManageMembers={() => setSheetOpen("members")}
-                  onError={fail}
-                  onNotify={notify}
-                />
+                {["Content", "Extras", "JSON"].map((t) => (
+                  <Inspector
+                    key={t}
+                    tab={t}
+                    message={message}
+                    project={project}
+                    commit={commit}
+                    patch={patchMessage}
+                    onManageMembers={() => setSheetOpen("members")}
+                    onError={fail}
+                    onNotify={notify}
+                  />
+                ))}
               </div>
             </section>
           ) : null}
@@ -1132,7 +1186,7 @@ export function Builder({ user, canSignIn = true, shared = null }) {
         subtitle="Everyone who can send a message in this mockup. Pick who sent a message on the message itself."
         wide
       >
-        <UsersPanel project={project} commit={commit} onError={fail} />
+        <UsersPanel project={project} commit={commit} onError={fail} focus={focusUser} />
       </Sheet>
 
       <Sheet

@@ -250,6 +250,7 @@
 /* ----------------------------------------------------------------- tools */
 
 .c-tools {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -262,6 +263,8 @@
   box-shadow: var(--mac-lift);
 }
 .c-tool {
+  position: relative;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -283,8 +286,8 @@
   background: var(--g-fill-2);
   color: var(--g-ink);
 }
+/* The blob carries the fill now, so the pressed tool only changes its ink. */
 .c-tool[data-on="true"] {
-  background: var(--g-accent-soft);
   color: var(--g-accent-ink);
 }
 

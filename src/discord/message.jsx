@@ -129,7 +129,7 @@ function ThreadTag({ thread }) {
   );
 }
 
-function MessageRow({ message, replyTo, selected, onSelect }) {
+function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, landing }) {
   const { users, edit } = useContext(RenderContext);
   const [stamping, setStamping] = useState(false);
   const clock = useRef(null);
@@ -150,6 +150,8 @@ function MessageRow({ message, replyTo, selected, onSelect }) {
       className={`dc-message${grouped ? " dc-grouped" : ""}${selected ? " dc-selected" : ""}${
         message.ephemeral ? " dc-ephemeral" : ""
       }${message.pinned ? " dc-pinned" : ""}`}
+      data-held={held ? "true" : undefined}
+      data-landing={landing ? "true" : undefined}
       onClick={onSelect}
       /* Clickable means reachable: without these the canvas is a wall a
          keyboard cannot get into, and the focus ring the stylesheet draws
@@ -174,6 +176,16 @@ function MessageRow({ message, replyTo, selected, onSelect }) {
           list beside it that has to be kept in sync with what is selected. */}
       {edit ? (
         <div className="dc-rail" aria-label="This message">
+          <span
+            className="dc-rail-grip"
+            role="button"
+            tabIndex={-1}
+            aria-label="Drag to reorder"
+            title="Drag to reorder"
+            {...(dragHandlers ?? {})}
+          >
+            <Icon name="more-vertical" size={15} />
+          </span>
           <button
             type="button"
             className="dc-rail-btn"

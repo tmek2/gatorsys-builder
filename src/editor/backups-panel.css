@@ -1,3 +1,15 @@
+/* One rhythm down the sheet. Each block used to set its own margin, so the
+   gaps were whatever the last author happened to type — the label of the name
+   field sat flush against the box above it. */
+.b-root {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.b-root > * {
+  margin: 0;
+}
+
 .b-state {
   display: flex;
   align-items: flex-start;
@@ -208,7 +220,6 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-bottom: 14px;
 }
 .b-find-label {
   display: flex;
@@ -303,4 +314,54 @@
   .b-open-hint {
     opacity: 1;
   }
+}
+
+/* ------------------------------------------------- the flattened panel */
+
+/* One list, not three boxes. The sections said where the bytes were kept,
+   which is a diagram of the storage rather than an answer to "which copy do I
+   want back". */
+.b-panel {
+  padding: 6px;
+  border: 1px solid var(--g-line);
+  border-radius: var(--g-r-inset);
+  background: var(--g-fill);
+}
+
+.b-auto-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 6px 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--g-line);
+  color: var(--g-ink-faint);
+  font-size: 11px;
+  font-weight: 700;
+}
+.b-panel > .b-auto-head:first-child {
+  margin-top: 2px;
+  padding-top: 0;
+  border-top: 0;
+}
+.b-panel-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+/* The automatic half of the list is quieter than the half you made. */
+.b-list-auto {
+  opacity: 0.72;
+}
+.b-list-auto:hover {
+  opacity: 1;
+}
+
+.b-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
 }

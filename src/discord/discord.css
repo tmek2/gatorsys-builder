@@ -1838,8 +1838,9 @@
   transition: background 120ms ease, box-shadow 120ms ease;
 }
 .dc-inline:hover {
-  background: color-mix(in srgb, currentColor 8%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 8%, transparent);
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 10%, transparent);
+  cursor: text;
 }
 .dc-inline:focus-visible {
   outline: 2px solid var(--dc-blurple, #5865f2);
@@ -2071,9 +2072,15 @@
     opacity 160ms ease,
     transform 260ms cubic-bezier(0.32, 0.72, 0, 1);
 }
-.dc-message:hover > .dc-rail,
+/* On the message you have picked, not on every message the pointer crosses.
+   Hovering was the loudest thing in the editor: dragging the pointer over a
+   conversation set four rails flashing in and out, none of which you asked
+   for. Selection is one click and it is a thing you meant, so the controls
+   follow it instead — and they still appear on hover once a row is selected,
+   so moving between neighbours is not a click each time. */
+.dc-message.dc-selected > .dc-rail,
+.dc-system.dc-selected > .dc-rail,
 .dc-message:focus-within > .dc-rail,
-.dc-system:hover > .dc-rail,
 .dc-system:focus-within > .dc-rail {
   opacity: 1;
   transform: none;
@@ -2113,4 +2120,46 @@
     transform: none;
     pointer-events: auto;
   }
+}
+
+/* ------------------------------------------------------- dragging a row */
+
+.dc-rail-grip {
+  display: grid;
+  width: 22px;
+  height: 24px;
+  place-items: center;
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: grab;
+  touch-action: none;
+}
+.dc-rail-grip:hover {
+  background: var(--background-mod-normal);
+  color: var(--text-strong);
+}
+.dc-stream[data-dragging="true"] .dc-rail-grip {
+  cursor: grabbing;
+}
+/* Nothing should highlight while a row is being dragged — a drag that paints a
+   text selection across the mockup is the browser deciding this was a
+   different gesture than it was. */
+.dc-stream[data-dragging="true"] {
+  user-select: none;
+}
+
+/* The row being carried, and the slot it would land in. Discord has neither,
+   so both are editor chrome and neither survives an export. */
+.dc-message[data-held="true"] {
+  opacity: 0.55;
+}
+.dc-message[data-landing="true"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--dc-blurple, #5865f2);
 }

@@ -295,7 +295,7 @@ export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink,
   const exact = named.some((r) => r.name.toLowerCase() === query.trim().toLowerCase());
 
   return (
-    <>
+    <div className="b-root">
       {/* The backup this mockup belongs to, if it belongs to one. Everything
           about it is here: what it is called, when it was last written, and
           the two things you can do to the relationship. */}
@@ -327,15 +327,7 @@ export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink,
             </Tooltip>
           </span>
         </div>
-      ) : (
-        <div className="b-state" data-saved={savedLocally ? "true" : "false"}>
-          <IconDeviceFloppy size={15} />
-          <span>
-            <strong>{savedLocally ? "Saved in this browser" : "Saving\u2026"}</strong>
-            <em>Written on every change and restored when you come back. Not a backup.</em>
-          </span>
-        </div>
-      )}
+      ) : null}
 
       {/* One field for both jobs, because with a list this long they are the
           same job: you type a name to find it, and if it is not there yet the
@@ -369,10 +361,11 @@ export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink,
         </div>
       </div>
 
-      <Group
-        title="Backups in this browser"
-        action={<span className="b-count">{named.length}</span>}
-      >
+      {/* One list. It was three boxes — this browser, the cloud, and files —
+          which is a diagram of where the bytes live rather than an answer to
+          "which copy do I want back". A backup is a backup; where it is kept
+          is a mark on the row. */}
+      <div className="b-panel">
         {rows === null ? (
           <Empty>Reading your backups…</Empty>
         ) : named.length === 0 ? (
@@ -397,35 +390,39 @@ export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink,
             ))}
           </ul>
         )}
-      </Group>
 
-      <Group title="Automatic snapshots" collapsible open={false}>
-        <p className="e-field-hint">
-          Taken while you work and pruned to the last {AUTO_KEEP}. These are the ones that cover
-          “I pasted over everything” — they are not a place to keep anything on purpose.
-        </p>
-        {autos.length === 0 ? (
-          <Empty>Nothing yet. The first is taken a minute or two in.</Empty>
-        ) : (
-          <ul className="b-list">
-            {autos.map((row) => (
-              <BackupRow
-                key={row.id}
-                row={row}
-                busy={busy}
-                onOpen={() => open(row.id)}
-                onDelete={() => remove(row.id)}
-              />
-            ))}
-          </ul>
-        )}
-      </Group>
+        {/* The automatic ones follow the ones you made, under a rule rather
+            than in a box of their own: same list, quieter half. They are what
+            covers "I pasted over everything", so they belong where somebody
+            looking for a way back is already looking. */}
+        {autos.length ? (
+          <>
+            <p className="b-auto-head">
+              Taken automatically, last {AUTO_KEEP} kept
+            </p>
+            <ul className="b-list b-list-auto">
+              {autos.map((row) => (
+                <BackupRow
+                  key={row.id}
+                  row={row}
+                  busy={busy}
+                  onOpen={() => open(row.id)}
+                  onDelete={() => remove(row.id)}
+                />
+              ))}
+            </ul>
+          </>
+        ) : null}
+      </div>
 
-      <Group
-        title="Cloud"
-        action={
-          user && !noCloud ? (
-            <span className="b-cloud-tools">
+      {/* The cloud copies join the same list when there are any, marked with a
+          cloud rather than fenced off in a section that says "Cloud is
+          switched off on this deployment" to somebody who never asked. */}
+      {user && !noCloud && cloud?.length ? (
+        <div className="b-panel">
+          <p className="b-auto-head">
+            Kept on your account — these survive a cleared browser
+            <span className="b-panel-tools">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button type="button" className="e-icon-btn" onClick={refreshCloud} aria-label="Refresh">
@@ -438,32 +435,7 @@ export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink,
                 <IconCloudCheck size={14} /> Back up
               </button>
             </span>
-          ) : null
-        }
-      >
-        {!canSignIn ? (
-          <Empty>
-            This deployment has no account set up, so there is nowhere to keep a cloud copy. Everything
-            above still works, and the project file is a full copy you can keep anywhere.
-          </Empty>
-        ) : !user ? (
-          <div className="b-signin">
-            <IconCloudOff size={24} />
-            <p>
-              Sign in with the same Discord account you use for Gator and a copy is kept on the
-              deployment — the only one that survives a cleared browser or a different machine.
-            </p>
-            <a className="e-btn e-btn-solid" href="/signin">
-              Sign in with Discord
-            </a>
-          </div>
-        ) : noCloud ? (
-          <Empty>Cloud backup is switched off on this deployment.</Empty>
-        ) : cloud === null ? (
-          <Empty>Reading your cloud backups…</Empty>
-        ) : cloud.length === 0 ? (
-          <Empty>Nothing in the cloud yet.</Empty>
-        ) : (
+          </p>
           <ul className="b-list">
             {cloud.map((row) => (
               <BackupRow
@@ -476,28 +448,35 @@ export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink,
               />
             ))}
           </ul>
-        )}
-      </Group>
-
-      <Group title="Files" collapsible open={false}>
-        <p className="e-field-hint">
-          A project file is the whole mockup, including every pasted image. It is the copy that does
-          not depend on this browser or on us.
-        </p>
-        <div className="b-files">
-          <button type="button" className="e-btn e-btn-quiet" onClick={() => onLoad(null, null, "import")}>
-            <IconUpload size={14} /> Import a project file
-          </button>
-          <button type="button" className="e-btn e-btn-quiet" onClick={() => onLoad(null, null, "export")}>
-            <IconDownload size={14} /> Download this project
-          </button>
         </div>
-      </Group>
+      ) : null}
+
+      {/* One quiet row, not three boxes: sign in to keep a copy off this
+          machine, and move the project in or out as a file. */}
+      <div className="b-tools">
+        {canSignIn && !user ? (
+          <a className="e-btn e-btn-quiet" href="/signin">
+            <IconCloudOff size={14} /> Sign in to keep a copy off this browser
+          </a>
+        ) : null}
+        {user && !noCloud && !cloud?.length ? (
+          <button type="button" className="e-btn e-btn-quiet" onClick={pushCloud} disabled={busy}>
+            <IconCloudCheck size={14} /> Keep a copy on your account
+          </button>
+        ) : null}
+        <span className="c-dock-spacer" />
+        <button type="button" className="e-btn e-btn-quiet" onClick={() => onLoad(null, null, "import")}>
+          <IconUpload size={14} /> Import a file
+        </button>
+        <button type="button" className="e-btn e-btn-quiet" onClick={() => onLoad(null, null, "export")}>
+          <IconDownload size={14} /> Download
+        </button>
+      </div>
 
       <p className="e-field-hint b-foot">
         <IconHistory size={13} /> Undo goes back 50 steps within this session; backups go back
         further and survive a reload.
       </p>
-    </>
+    </div>
   );
 }

@@ -17,7 +17,8 @@
  * second layout, and it is drawn as one.
  */
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useRef } from "react";
+import { useDragOrder } from "./use-drag-order";
 import { RenderContext } from "./context";
 import { Icon } from "./icon";
 import { InlineText } from "./inline";
@@ -213,7 +214,7 @@ function Typing({ names }) {
 
 /* ------------------------------------------------------------- surface */
 
-export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit }) {
+export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit, scroller }) {
   const canvas = project.canvas ?? {};
   const mobile = canvas.platform === "mobile";
 
@@ -244,13 +245,19 @@ export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit }
     [onSelect],
   );
 
+  /* Dragging a message into place on the preview, which is where somebody
+     looking at the order wants to change it. The arrows on each row do the
+     same job for a keyboard and for a short move. */
+  const stream = useRef(null);
+  const order = useDragOrder({ onMove: (from, to) => edit?.reorder(from, to), scroller });
+
   const byId = useMemo(
     () => new Map((project.messages ?? []).map((m) => [m.id, m])),
     [project.messages],
   );
 
-  const stream = (
-    <div className="dc-stream">
+  const rows = (
+    <div className="dc-stream" ref={stream} data-dragging={order.dragging ? "true" : "false"}>
       {canvas.showDateDivider ? <DateDivider label={canvas.dateLabel || "Today"} /> : null}
       {(project.messages ?? []).map((message, i) => (
         <div key={message.id}>
@@ -260,6 +267,9 @@ export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit }
             replyTo={message.reply ? byId.get(message.reply) : undefined}
             selected={selectedId === message.id}
             onSelect={onSelect ? pick : undefined}
+            dragHandlers={edit ? order.handlers(i, stream) : undefined}
+            held={order.drag?.from === i}
+            landing={order.drag && order.drag.to === i && order.drag.from !== i}
           />
         </div>
       ))}
@@ -315,7 +325,7 @@ export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit }
                 : undefined
             }
           >
-            {stream}
+            {rows}
           </div>
           {canvas.chrome !== "none" ? <Composer canvas={canvas} mobile={mobile} /> : null}
         </div>

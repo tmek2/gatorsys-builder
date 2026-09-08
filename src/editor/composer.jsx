@@ -25,8 +25,10 @@ import {
   IconSparkles,
   IconSquaresFilled,
 } from "@tabler/icons-react";
+import { Blob, useBlob } from "@/gator/blob";
 import { Icon } from "@/discord/icon";
 import { Hint } from "./fields";
+import { EmojiInsert } from "./emoji-picker";
 
 /* What the right rail opens. The labels are the words somebody would use for
    the thing they want to add, not the names of our tabs. */
@@ -142,10 +144,13 @@ export function Composer({
   onAddAuthor,
   onSend,
   onTool,
+  onAdd,
   channel,
+  emojis,
 }) {
   const [draft, setDraft] = useState("");
   const field = useRef(null);
+  const blob = useBlob(tool);
 
   /* The bar grows with what is in it, the way the client's does, and stops at
      a height that still leaves the mockup visible behind it. */
@@ -177,8 +182,8 @@ export function Composer({
         {/* Discord's own controls, and only those. Drawn rather than wired,
             like everything else on a mockup — pressing one opens the editor
             panel that actually adds the thing. */}
-        <Hint label="Add an attachment, a file or a sticker">
-          <button type="button" className="c-bar-btn" onClick={() => onTool("Extras")} aria-label="Attach">
+        <Hint label="Add an image, a file or a voice note to this message">
+          <button type="button" className="c-bar-btn" onClick={() => onAdd("attachment")} aria-label="Attach">
             <Icon name="attach" size={22} />
           </button>
         </Hint>
@@ -201,32 +206,32 @@ export function Composer({
           }}
         />
 
+        {/* Each does its own job. They all used to open the same panel, which
+            made four buttons that were one button wearing four faces — and the
+            gift is not here at all, because Discord's gift button opens a Nitro
+            purchase and there is no such thing to draw in a mockup. */}
         <span className="c-bar-tools">
-          <Hint label="Add a gift">
-            <button type="button" className="c-bar-btn" onClick={() => onTool("Extras")} aria-label="Gift">
-              <Icon name="gift" size={20} />
-            </button>
-          </Hint>
-          <Hint label="Add a GIF">
-            <button type="button" className="c-bar-btn" onClick={() => onTool("Extras")} aria-label="GIF">
+          <Hint label="Add a GIF to this message">
+            <button type="button" className="c-bar-btn" onClick={() => onAdd("gif")} aria-label="GIF">
               <Icon name="gif" size={20} />
             </button>
           </Hint>
-          <Hint label="Add a sticker">
-            <button type="button" className="c-bar-btn" onClick={() => onTool("Extras")} aria-label="Sticker">
+          <Hint label="Add a sticker to this message">
+            <button type="button" className="c-bar-btn" onClick={() => onAdd("sticker")} aria-label="Sticker">
               <Icon name="sticker" size={20} />
             </button>
           </Hint>
-          <Hint label="Add an emoji">
-            <button type="button" className="c-bar-btn" onClick={() => onTool("Extras")} aria-label="Emoji">
-              <Icon name="emoji" size={20} />
-            </button>
-          </Hint>
+          <EmojiInsert onPick={(emoji) => setDraft((d) => d + emoji)} custom={emojis} />
         </span>
       </div>
 
-      {/* Everything the message can carry, on the side the message is on. */}
-      <div className="c-tools" role="group" aria-label="Edit this message">
+      {/* Everything the message can carry, on the side the message is on.
+          One shape moves between the three rather than three backgrounds
+          fading in and out — the same indicator the site header uses, because
+          the eye tracks a moving object without being asked to and has to be
+          told about a fade. */}
+      <div className="c-tools" role="group" aria-label="Edit this message" {...blob.boxProps}>
+        <Blob />
         {TOOLS.map(({ id, label, hint, Glyph }) => (
           <Hint key={id} label={hint}>
             <button
@@ -235,6 +240,7 @@ export function Composer({
               data-on={tool === id ? "true" : "false"}
               aria-pressed={tool === id}
               onClick={() => onTool(id)}
+              {...blob.register(id)}
             >
               <Glyph size={17} stroke={1.9} />
               <span>{label}</span>

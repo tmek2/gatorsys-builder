@@ -166,16 +166,11 @@ function ContentTab({ message, patch, project, commit, onManageMembers, onError 
 
   return (
     <>
-      <Group title="Message">
-        <AuthorRow
-          message={message}
-          patch={patch}
-          project={project}
-          commit={commit}
-          onManageMembers={onManageMembers}
-          onError={onError}
-        />
-
+      <Group title="Message" collapsible open={false} icon={<Icon name="edit" size={16} />}>
+        {/* The author, the text and the timestamp are not here any more: the
+            island's pill says who is sending, and the words and the clock are
+            edited where they are drawn. What is left is the handful of things
+            a message is rather than says. */}
         <Field label="Kind" hint="A system message is the client's own one-line notice, not a message with an author.">
           <Segmented
             value={message.kind || "message"}
@@ -188,6 +183,8 @@ function ContentTab({ message, patch, project, commit, onManageMembers, onError 
           />
         </Field>
 
+        {/* A system message has no text to double-click on the canvas — the
+            client writes the sentence — so its two fields stay here. */}
         {message.kind === "system" ? (
           <>
             <Field label="What happened">
@@ -202,9 +199,14 @@ function ContentTab({ message, patch, project, commit, onManageMembers, onError 
             </Field>
           </>
         ) : (
+          /* The canvas is the quick way — click the words and type — but a
+             long piece of markdown is easier in a box you can see all of, so
+             the box stays. Taking it away entirely was a mistake: it left the
+             gesture as the only route, and a gesture nobody is told about is
+             not a route. */
           <Field
             label="Content"
-            hint="Markdown, mentions like <@Rowan>, channels like <#general>, timestamps like <t:1735689600:R>."
+            hint="Or click the message on the canvas and type. Markdown, mentions like <@Rowan>, channels like <#general>, timestamps like <t:1735689600:R>."
             counter={
               <span className="e-field-tools">
                 <EmojiInsert onPick={insert} custom={project.emojis} />
@@ -222,14 +224,10 @@ function ContentTab({ message, patch, project, commit, onManageMembers, onError 
             />
           </Field>
         )}
-
-        <Field label="Timestamp">
-          <Text value={message.timestamp} onChange={(v) => patch({ timestamp: v })} placeholder="Today at 10:03" />
-        </Field>
       </Group>
 
       {message.kind === "system" ? null : (
-        <Group title="How it is drawn" collapsible>
+        <Group title="How it is drawn" collapsible open={false} icon={<Icon name="configure" size={16} />}>
           <Toggle
             label="Grouped under the message above"
             hint="No avatar and no author line, the way the client groups a run from one person."
@@ -248,7 +246,7 @@ function ContentTab({ message, patch, project, commit, onManageMembers, onError 
         </Group>
       )}
 
-      <Group title="Reply" collapsible open={Boolean(message.reply)}>
+      <Group title="Reply" collapsible open={false} icon={<Icon name="reply" size={16} />} on={Boolean(message.reply)}>
         {others.length ? (
           <Field label="Replying to" hint="The client draws a spine up to the message being answered.">
             <Pick
@@ -270,7 +268,7 @@ function ContentTab({ message, patch, project, commit, onManageMembers, onError 
         )}
       </Group>
 
-      <Group title="Slash command header" collapsible open={Boolean(message.interaction)}>
+      <Group title="Slash command header" collapsible open={false} icon={<Icon name="apps" size={16} />} on={Boolean(message.interaction)}>
         {message.interaction ? (
           <>
             <Row>
@@ -304,7 +302,7 @@ function ContentTab({ message, patch, project, commit, onManageMembers, onError 
         )}
       </Group>
 
-      <Group title="Forwarded message" collapsible open={Boolean(message.forwarded)}>
+      <Group title="Forwarded message" collapsible open={false} icon={<Icon name="forward" size={16} />} on={Boolean(message.forwarded)}>
         {message.forwarded ? (
           <>
             <Field label="What was forwarded">
@@ -1173,7 +1171,14 @@ export function Inspector({ tab, message, project, patch, commit, onManageMember
     case "Extras":
       return <ExtrasTab message={message} patch={patch} project={project} onError={onError} />;
     case "JSON":
-      return <JsonPanel message={message} patch={patch} onError={onError} onNotify={onNotify} />;
+      /* Wrapped, so it is a tile in the board like everything else rather than
+         a wall of monospace that the grid has to make room for whether or not
+         anybody wanted it. */
+      return (
+        <Group title="JSON" collapsible open={false} icon={<Icon name="code" size={16} />}>
+          <JsonPanel message={message} patch={patch} onError={onError} onNotify={onNotify} />
+        </Group>
+      );
     default:
       return (
         <ContentTab

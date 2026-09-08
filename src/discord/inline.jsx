@@ -100,7 +100,16 @@ export function InlineText({
       className={`dc-inline ${className}`}
       role="button"
       tabIndex={0}
-      title={label ? `${label} — double-click to edit` : "Double-click to edit"}
+      title={label ? `${label} — click to edit` : "Click to edit"}
+      /* One click, not two. Double-click is what a title in a document editor
+         takes, and it is also a gesture nobody is told about: the first report
+         of this said "I can't edit message contents at all", from somebody
+         looking straight at the text they wanted to change. Clicking the words
+         edits the words; clicking anywhere else on the row selects it. */
+      onClick={(event) => {
+        event.stopPropagation();
+        setEditing(true);
+      }}
       onDoubleClick={(event) => {
         event.stopPropagation();
         setEditing(true);

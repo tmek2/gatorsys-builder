@@ -64,7 +64,7 @@ export function AvatarPicker({ value, onChange, onClose, inline = false }) {
   );
 }
 
-export function UsersPanel({ project, commit, onError }) {
+export function UsersPanel({ project, commit, onError, focus = null }) {
   const [picking, setPicking] = useState(null);
 
   const patch = (id, over) =>
@@ -92,7 +92,10 @@ export function UsersPanel({ project, commit, onError }) {
           key={user.id}
           title={user.name || `Member ${i + 1}`}
           collapsible
-          open={i === 0}
+          /* The one that was asked for, or the first when nobody was named.
+             Opening on "whoever is first" is how pressing edit on one person
+             showed you another. */
+          open={focus ? user.id === focus : i === 0}
           action={
             <button type="button" className="e-icon-btn" onClick={() => remove(user.id)} aria-label="Remove member">
               <IconTrash size={14} />
