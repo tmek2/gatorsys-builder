@@ -33,6 +33,7 @@ export function InlineText({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value ?? "");
   const field = useRef(null);
+  const press = useRef(null);
 
   useEffect(() => {
     if (!editing) setDraft(value ?? "");
@@ -105,8 +106,22 @@ export function InlineText({
          takes, and it is also a gesture nobody is told about: the first report
          of this said "I can't edit message contents at all", from somebody
          looking straight at the text they wanted to change. Clicking the words
-         edits the words; clicking anywhere else on the row selects it. */
+         edits the words; clicking anywhere else on the row selects it.
+         A click that travelled is not a click, though — it is somebody
+         selecting the text, and swapping a field in under a half-made
+         selection throws it away. */
+      onPointerDown={(event) => {
+        press.current = { x: event.clientX, y: event.clientY };
+      }}
       onClick={(event) => {
+        const from = press.current;
+        press.current = null;
+        if (
+          from &&
+          Math.hypot(event.clientX - from.x, event.clientY - from.y) > 4
+        ) {
+          return;
+        }
         event.stopPropagation();
         setEditing(true);
       }}
@@ -122,7 +137,10 @@ export function InlineText({
         }
       }}
     >
-      {render ? render() : (value || placeholder)}
+      {/* Never nothing. An empty value renders a zero-width span, which is a
+          control nobody can hit — so a name somebody cleared could not be
+          typed back in. */}
+      {render ? render() : value || <span className="dc-inline-empty">{placeholder || "Empty"}</span>}
     </span>
   );
 }

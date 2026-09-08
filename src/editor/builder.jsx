@@ -363,6 +363,53 @@ export function Builder({ user, canSignIn = true, shared = null }) {
           messages.splice(to, 0, held);
           return { ...p, messages };
         }),
+      /* Renaming a member from the mockup. Tagged so a name being typed is one
+         undo step rather than one per letter — and, more to the point, so the
+         project is not rewritten from scratch on every keystroke. */
+      rename: (id, name) =>
+        commit(
+          (p) => ({ ...p, users: p.users.map((u) => (u.id === id ? { ...u, name } : u)) }),
+          `u:${id}:name`,
+        ),
+      member: (id) => {
+        setFocusUser(id ?? null);
+        setSheetOpen("members");
+      },
+      /* What the right-click menu offers, which depends on what was under the
+         pointer: a message, or the canvas around it. */
+      menu: (id) => {
+        if (!id) {
+          return [
+            { id: "add", label: "Add a message", icon: "plus", keys: "\u2318\u21B5", run: () => addMessage() },
+            { id: "member", label: "Add a member", icon: "add-friends", run: () => addUser() },
+            "-",
+            { id: "appearance", label: "Appearance and chrome\u2026", icon: "settings", run: () => setSheetOpen("appearance") },
+            { id: "templates", label: "Start from a template\u2026", icon: "copy-text", run: () => setSheetOpen("templates") },
+            "-",
+            { id: "png", label: "Export a PNG", icon: "download", run: () => doExportPng() },
+          ];
+        }
+        const at = project.messages.findIndex((m) => m.id === id);
+        return [
+          { id: "edit", label: "Edit this message", icon: "edit", run: () => { setSelected(id); setTrayOpen(true); setPanelOpen(false); } },
+          { id: "embeds", label: "Add an embed", icon: "external", run: () => { setSelected(id); setTab("Embeds"); setTrayOpen(false); setPanelOpen(true); } },
+          { id: "components", label: "Add components", icon: "apps", run: () => { setSelected(id); setTab("Components"); setTrayOpen(false); setPanelOpen(true); } },
+          "-",
+          { id: "up", label: "Move up", icon: "caret-up", disabled: at <= 0, run: () => edit.move(id, -1) },
+          { id: "down", label: "Move down", icon: "caret-down", disabled: at === project.messages.length - 1, run: () => edit.move(id, 1) },
+          { id: "dup", label: "Duplicate", icon: "copy-text", keys: "\u2318D", run: () => edit.duplicate(id) },
+          "-",
+          { id: "copy", label: "Copy the payload", icon: "copy-id", run: () => copyJson() },
+          {
+            id: "delete",
+            label: "Delete this message",
+            icon: "delete",
+            danger: true,
+            disabled: project.messages.length <= 1,
+            run: () => edit.remove(id),
+          },
+        ];
+      },
       move: (id, by) =>
         commit((p) => {
           const i = p.messages.findIndex((m) => m.id === id);
@@ -732,6 +779,25 @@ export function Builder({ user, canSignIn = true, shared = null }) {
         setSheetOpen(null);
         return;
       }
+      /* The zoom shortcuts every canvas has. `=` because that is the key the
+         `+` is printed on, and the browser's own zoom is what ctrl-plus does
+         everywhere else — which is why this claims it rather than leaving the
+         page to grow around a canvas that has its own zoom. */
+      if (mod && (event.key === "=" || event.key === "+")) {
+        event.preventDefault();
+        setZoom((z) => Math.min(2, Math.round((z + 0.1) * 10) / 10));
+        return;
+      }
+      if (mod && (event.key === "-" || event.key === "_")) {
+        event.preventDefault();
+        setZoom((z) => Math.max(0.4, Math.round((z - 0.1) * 10) / 10));
+        return;
+      }
+      if (mod && event.key === "0") {
+        event.preventDefault();
+        setZoom(1);
+        return;
+      }
       if (typing) return;
 
       if (mod && event.key.toLowerCase() === "z") {
@@ -750,7 +816,7 @@ export function Builder({ user, canSignIn = true, shared = null }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [addMessage, duplicateMessage, redo, undo]);
+  }, [addMessage, duplicateMessage, redo, setZoom, undo]);
 
   /* ------------------------------------------------------------- render */
 

@@ -596,6 +596,21 @@
   padding: 55vh 45vw;
 }
 
+/* Nothing outside the mockup is text, so nothing outside it should select.
+   Double-clicking the empty stage used to paint a selection across the page,
+   which then swallowed the next drag. */
+.e-stage-scroll {
+  user-select: none;
+}
+/* Inside it, everything selects normally — a mockup is a picture of words and
+   copying them out of it is a reasonable thing to want. The cursor says so
+   too: a grab hand over text that selects rather than pans is the same lie
+   the draggable-background cursor used to tell. */
+.e-stage-scroll .dc {
+  user-select: text;
+  cursor: auto;
+}
+
 .e-stage-scroll[data-grabbing="true"] {
   cursor: grabbing;
   /* Nothing should highlight while the canvas is being moved — a drag that

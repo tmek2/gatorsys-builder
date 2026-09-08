@@ -31,10 +31,15 @@ function gridClass(n) {
 }
 
 export function GalleryGrid({ items = [] }) {
-  if (!items.length) return null;
+  /* Only the ones that are actually a picture. An attachment with no source
+     yet is a row in the editor, not half a grid on the canvas — and the layout
+     has to be decided on what will be drawn, or two items where one is empty
+     lays out as a pair and paints one of them as a grey rectangle. */
+  const shown = items.filter((item) => item.src);
+  if (!shown.length) return null;
   return (
-    <div className={`dc-gallery ${gridClass(items.length)}`}>
-      {items.map((item, i) => (
+    <div className={`dc-gallery ${gridClass(shown.length)}`}>
+      {shown.map((item, i) => (
         <figure className={`dc-gallery-cell${item.spoiler ? " dc-media-spoiler" : ""}`} key={item.id ?? i}>
           {/^data:video|\.(mp4|webm|mov)(\?|$)/i.test(item.src || "") ? (
             <video src={item.src} controls playsInline />

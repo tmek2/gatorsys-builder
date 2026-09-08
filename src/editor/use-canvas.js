@@ -88,12 +88,13 @@ export function useCanvasGestures({ scrollerRef, zoom, setZoom }) {
       // Only a plain press on the background. A middle-click pans in most
       // canvases too, so it is allowed; anything with a modifier is not ours.
       if (event.button !== 0 && event.button !== 1) return;
-      /* Only real controls are excluded. Messages are not: they cover most of
-         the canvas, and a pan you can only start from the margins is a pan
-         nobody finds. Pressing a message still selects it — a press that does
-         not travel is a click, and the click after one that did is swallowed
-         below. */
       if (event.target.closest("button, input, textarea, select, a")) return;
+      /* The mockup itself is not pannable ground. Dragging across a message
+         is somebody selecting its text — the most ordinary thing to do to
+         words on a screen — and answering that with a scroll is the interface
+         deciding it knows better. The stage around it is the ground, and a
+         middle-click pans from anywhere for when the mockup fills the view. */
+      if (event.button === 0 && event.target.closest(".dc")) return;
 
       // Catching a throw is the first thing a press does.
       stopGlide();

@@ -17,8 +17,9 @@
  * second layout, and it is drawn as one.
  */
 
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useDragOrder } from "./use-drag-order";
+import { ContextMenu } from "./menu";
 import { RenderContext } from "./context";
 import { Icon } from "./icon";
 import { InlineText } from "./inline";
@@ -249,6 +250,20 @@ export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit, 
      looking at the order wants to change it. The arrows on each row do the
      same job for a keyboard and for a short move. */
   const stream = useRef(null);
+
+  /* Right-clicking a mockup should offer what you can do to a mockup, not
+     Reload and View Page Source. */
+  const [menu, setMenu] = useState(null);
+  const openMenu = useCallback(
+    (event, id) => {
+      if (!edit) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (id) onSelect?.(id);
+      setMenu({ at: { x: event.clientX, y: event.clientY }, id });
+    },
+    [edit, onSelect],
+  );
   const order = useDragOrder({ onMove: (from, to) => edit?.reorder(from, to), scroller });
 
   const byId = useMemo(
@@ -268,6 +283,7 @@ export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit, 
             selected={selectedId === message.id}
             onSelect={onSelect ? pick : undefined}
             dragHandlers={edit ? order.handlers(i, stream) : undefined}
+            onMenu={edit ? (event) => openMenu(event, message.id) : undefined}
             held={order.drag?.from === i}
             landing={order.drag && order.drag.to === i && order.drag.from !== i}
           />
@@ -305,6 +321,7 @@ export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit, 
               : ""
         }`}
         style={surfaceStyle}
+        onContextMenu={edit ? (event) => openMenu(event, null) : undefined}
       >
         {canvas.chrome === "full" && !mobile ? <ServerRail canvas={canvas} /> : null}
         {canvas.chrome === "full" && !mobile ? <ChannelList canvas={canvas} /> : null}
@@ -332,6 +349,13 @@ export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit, 
 
         {canvas.chrome === "full" && !mobile ? <MemberList canvas={canvas} users={ctx.users} /> : null}
       </div>
+      {menu ? (
+        <ContextMenu
+          at={menu.at}
+          onClose={() => setMenu(null)}
+          items={edit.menu(menu.id)}
+        />
+      ) : null}
     </RenderContext.Provider>
   );
 }

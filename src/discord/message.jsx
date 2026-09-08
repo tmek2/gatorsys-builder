@@ -34,12 +34,25 @@ function VerifiedMark() {
   );
 }
 
-function Author({ user }) {
+function Author({ user, edit }) {
   if (!user) return null;
   return (
     <span className="dc-author">
+      {/* The name is edited on the name. Everything else about a member is a
+          form somewhere, but the two things you look at while judging a mockup
+          — what they are called and what they look like — are changed by
+          pressing them. */}
       <span className="dc-username" style={user.color ? { color: user.color } : undefined}>
-        {user.name}
+        {edit ? (
+          <InlineText
+            value={user.name}
+            onChange={(name) => edit.rename(user.id, name)}
+            label="Member name"
+            placeholder="Unnamed"
+          />
+        ) : (
+          user.name
+        )}
       </span>
       {user.roleIcon ? <img className="dc-role-icon" src={user.roleIcon} alt="" /> : null}
       {/* The server tag. A small pill after the name, with the server's icon
@@ -129,7 +142,7 @@ function ThreadTag({ thread }) {
   );
 }
 
-function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, landing }) {
+function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, landing, onMenu }) {
   const { users, edit } = useContext(RenderContext);
   const [stamping, setStamping] = useState(false);
   const clock = useRef(null);
@@ -150,6 +163,7 @@ function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, 
       className={`dc-message${grouped ? " dc-grouped" : ""}${selected ? " dc-selected" : ""}${
         message.ephemeral ? " dc-ephemeral" : ""
       }${message.pinned ? " dc-pinned" : ""}`}
+      onContextMenu={onMenu}
       data-held={held ? "true" : undefined}
       data-landing={landing ? "true" : undefined}
       onClick={onSelect}
@@ -249,7 +263,32 @@ function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, 
           <time className="dc-hover-time">{(message.timestamp || "").split(" at ").pop()}</time>
         ) : (
           <span className="dc-avatar-slot">
-            <img className="dc-avatar" src={user?.avatar} alt="" draggable={false} />
+            {edit ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                className="dc-avatar dc-avatar-live"
+                src={user?.avatar}
+                alt=""
+                draggable={false}
+                role="button"
+                tabIndex={0}
+                title={`Change ${user?.name ?? "this member"}'s picture`}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  edit.member(user?.id);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    edit.member(user?.id);
+                  }
+                }}
+              />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="dc-avatar" src={user?.avatar} alt="" draggable={false} />
+            )}
             {user?.decoration ? <img className="dc-decoration" src={user.decoration} alt="" /> : null}
           </span>
         )}
@@ -258,7 +297,7 @@ function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, 
       <div className="dc-body">
         {grouped ? null : (
           <div className="dc-meta">
-            <Author user={user} />
+            <Author user={user} edit={edit} />
             {edit ? (
               <span className="dc-time-slot">
                 <time

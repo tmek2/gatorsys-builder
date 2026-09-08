@@ -20,23 +20,36 @@ export function Sheet({ open, onClose, title, subtitle, wide = false, children }
   const state = useOverlay(open);
   const box = useRef(null);
 
-  /* Escape closes it, and focus moves inside on open so a keyboard is not
-     left behind the scrim tabbing through a page it cannot see. */
+  /* The live handler, read through a ref. `onClose` is written inline at every
+     call site, so it is a new function on every render of the editor — and an
+     effect that depends on it re-runs on every keystroke. That is not
+     theoretical: it took focus out of the field being typed into, forty
+     milliseconds after each letter, which read as "the name field kicks me out
+     every time I type". */
+  const close = useRef(onClose);
+  close.current = onClose;
+
+  /* Escape closes it. Nothing here depends on the handler's identity. */
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (event) => {
       if (event.key === "Escape") {
         event.stopPropagation();
-        onClose();
+        close.current();
       }
     };
     document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  /* Focus moves inside once, on open, so a keyboard is not left behind the
+     scrim tabbing through a page it cannot see — and never again, because
+     moving focus is something you do to somebody. */
+  useEffect(() => {
+    if (!open) return undefined;
     const id = window.setTimeout(() => box.current?.focus(), 40);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      window.clearTimeout(id);
-    };
-  }, [open, onClose]);
+    return () => window.clearTimeout(id);
+  }, [open]);
 
   if (!state.mounted) return null;
 
