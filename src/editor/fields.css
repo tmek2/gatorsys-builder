@@ -401,11 +401,55 @@ textarea.e-control {
 .e-group[data-open="false"] .e-group-caret {
   transform: rotate(-90deg);
 }
+/* Collapsing to a height nobody measured: the wrapper is a one-row grid whose
+   row goes from 0fr to 1fr, and the child has `min-height: 0` so it is allowed
+   to be squashed. Animating `height` would need a number, and a JavaScript one
+   fights every field inside that resizes itself. */
+.e-group-wrap {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 260ms var(--g-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.e-group[data-open="false"] .e-group-wrap {
+  grid-template-rows: 0fr;
+}
 .e-group-body {
   display: flex;
+  min-height: 0;
   flex-direction: column;
   gap: 12px;
   padding: 12px 10px;
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity 200ms ease 60ms, padding 260ms var(--g-ease-out, cubic-bezier(0.16, 1, 0.3, 1));
+}
+.e-group[data-open="false"] .e-group-body {
+  padding-block: 0;
+  opacity: 0;
+  transition-delay: 0ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  .e-group-wrap,
+  .e-group-body {
+    transition: none;
+  }
+}
+
+/* The tile's glyph and its "this is on" dot. */
+.e-group-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--g-ink-faint);
+}
+.e-group[data-on="true"] .e-group-icon {
+  color: var(--g-accent);
+}
+.e-group-dot {
+  width: 6px;
+  height: 6px;
+  margin-left: 2px;
+  border-radius: 50%;
+  background: var(--g-accent);
 }
 
 .e-empty {

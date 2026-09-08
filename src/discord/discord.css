@@ -2040,3 +2040,77 @@
   font-weight: 700;
   text-align: center;
 }
+
+/* ------------------------------------------------- the message's own rail */
+
+/* Reordering, duplicating and deleting, on the message they act on. It sits
+   outside the message's left edge so it never covers the avatar or the text,
+   and it is invisible until the row is pointed at — the canvas is a picture of
+   Discord, and Discord has no such rail. */
+.dc-rail {
+  position: absolute;
+  /* Inside the message, not beside it. Outside its left edge the rail looked
+     better and did not work: reaching for it takes the pointer off the row
+     whose `:hover` is the only thing keeping the rail on screen, so it faded
+     out from under the cursor. Bottom-right keeps it inside the hover area and
+     clear of the drawn hover toolbar, which the client puts at the top. */
+  right: 6px;
+  bottom: 6px;
+  z-index: 3;
+  display: flex;
+  gap: 1px;
+  padding: 3px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 9px;
+  background: var(--background-base-lower);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  transform: translateY(4px) scale(0.96);
+  pointer-events: none;
+  transition:
+    opacity 160ms ease,
+    transform 260ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+.dc-message:hover > .dc-rail,
+.dc-message:focus-within > .dc-rail,
+.dc-system:hover > .dc-rail,
+.dc-system:focus-within > .dc-rail {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dc-rail { transition: opacity 100ms ease; }
+}
+
+.dc-rail-btn {
+  display: grid;
+  width: 26px;
+  height: 24px;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+.dc-rail-btn:hover,
+.dc-rail-btn:focus-visible {
+  background: var(--background-mod-normal);
+  color: var(--text-strong);
+}
+.dc-rail-danger:hover,
+.dc-rail-danger:focus-visible {
+  background: color-mix(in srgb, var(--dc-red, #ed4245) 18%, transparent);
+  color: var(--dc-red, #ed4245);
+}
+
+/* A touch screen has no hover, so the rail is always there on one. */
+@media (pointer: coarse) {
+  .dc-rail {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+}

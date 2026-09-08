@@ -37,7 +37,7 @@ import {
   Text,
   Toggle,
 } from "./fields";
-import { Art } from "@/discord/icon";
+import { Art, Icon } from "@/discord/icon";
 import { badgeList } from "@/discord/badges";
 import { TOOLBAR_ACTIONS } from "@/discord/toolbar";
 import { AvatarPicker } from "./panels";
@@ -524,7 +524,7 @@ function ExtrasTab({ message, patch, project, onError }) {
 
   return (
     <>
-      <Group title="Attachments" collapsible open={attachments.length > 0}>
+      <Group title="Attachments" collapsible open={false} icon={<Icon name="attach" size={16} />} on={attachments.length > 0}>
         {attachments.map((a, n) => (
           <div className="e-sub" key={a.id}>
             <header className="e-sub-head">
@@ -591,7 +591,7 @@ function ExtrasTab({ message, patch, project, onError }) {
         </button>
       </Group>
 
-      <Group title="Reactions" collapsible open={reactions.length > 0}>
+      <Group title="Reactions" collapsible open={false} icon={<Icon name="add-reaction" size={16} />} on={reactions.length > 0}>
         {reactions.map((r, n) => (
           <div className="e-sub" key={r.id}>
             <header className="e-sub-head">
@@ -641,7 +641,7 @@ function ExtrasTab({ message, patch, project, onError }) {
         </button>
       </Group>
 
-      <Group title="Poll" collapsible open={Boolean(message.poll)}>
+      <Group title="Poll" collapsible open={false} icon={<Icon name="poll" size={16} />} on={Boolean(message.poll)}>
         {message.poll ? (
           <>
             <Field label="Question">
@@ -751,7 +751,7 @@ function ExtrasTab({ message, patch, project, onError }) {
         )}
       </Group>
 
-      <Group title="Voice message" collapsible open={Boolean(message.voice)}>
+      <Group title="Voice message" collapsible open={false} icon={<Icon name="microphone" size={16} />} on={Boolean(message.voice)}>
         {message.voice ? (
           <>
             <Row>
@@ -786,7 +786,7 @@ function ExtrasTab({ message, patch, project, onError }) {
       {/* Discord shows badges in the profile popout — not the member list and
           not beside a name in a message — so this is where the badge library
           belongs, and the popout is a surface mockups want in its own right. */}
-      <Group title="Profile card" collapsible open={Boolean(message.profile)}>
+      <Group title="Profile card" collapsible open={false} icon={<Icon name="profile" size={16} />} on={Boolean(message.profile)}>
         {message.profile ? (
           <>
             <div className="e-note">
@@ -896,7 +896,7 @@ function ExtrasTab({ message, patch, project, onError }) {
           draw — and where a button sits decides what it looks like: an emoji
           in the quick-reaction zone, a grey glyph in the action zone, exactly
           as the client does it. */}
-      <Group title="Hover toolbar" collapsible open={Boolean(message.toolbar)}>
+      <Group title="Hover toolbar" collapsible open={false} icon={<Icon name="more" size={16} />} on={Boolean(message.toolbar)}>
         {message.toolbar ? (
           <>
             <div className="e-note">
@@ -1008,7 +1008,7 @@ function ExtrasTab({ message, patch, project, onError }) {
         )}
       </Group>
 
-      <Group title="Sticker" collapsible open={Boolean(message.sticker)}>
+      <Group title="Sticker" collapsible open={false} icon={<Icon name="sticker" size={16} />} on={Boolean(message.sticker)}>
         <ImageField
           label="Sticker image"
           value={message.sticker?.src ?? ""}
@@ -1017,7 +1017,7 @@ function ExtrasTab({ message, patch, project, onError }) {
         />
       </Group>
 
-      <Group title="Thread" collapsible open={Boolean(message.thread)}>
+      <Group title="Thread" collapsible open={false} icon={<Icon name="threads" size={16} />} on={Boolean(message.thread)}>
         {message.thread ? (
           <>
             <Row>
@@ -1043,7 +1043,7 @@ function ExtrasTab({ message, patch, project, onError }) {
         )}
       </Group>
 
-      <Group title="Server invite" collapsible open={Boolean(message.invite)}>
+      <Group title="Server invite" collapsible open={false} icon={<Icon name="add-friends" size={16} />} on={Boolean(message.invite)}>
         {message.invite ? (
           <>
             <Field label="Server name">
@@ -1079,7 +1079,7 @@ function ExtrasTab({ message, patch, project, onError }) {
         )}
       </Group>
 
-      <Group title="Link preview" collapsible open={Boolean(message.linkPreview)}>
+      <Group title="Link preview" collapsible open={false} icon={<Icon name="external" size={16} />} on={Boolean(message.linkPreview)}>
         {message.linkPreview ? (
           <>
             <Row>

@@ -169,6 +169,62 @@ function MessageRow({ message, replyTo, selected, onSelect }) {
       }
       data-id={message.id}
     >
+      {/* What the left column used to be. Reordering, duplicating and deleting
+          belong to a message, so they live on the message rather than in a
+          list beside it that has to be kept in sync with what is selected. */}
+      {edit ? (
+        <div className="dc-rail" aria-label="This message">
+          <button
+            type="button"
+            className="dc-rail-btn"
+            title="Move up"
+            aria-label="Move this message up"
+            onClick={(event) => {
+              event.stopPropagation();
+              edit.move(message.id, -1);
+            }}
+          >
+            <Icon name="caret-up" size={15} />
+          </button>
+          <button
+            type="button"
+            className="dc-rail-btn"
+            title="Move down"
+            aria-label="Move this message down"
+            onClick={(event) => {
+              event.stopPropagation();
+              edit.move(message.id, 1);
+            }}
+          >
+            <Icon name="caret-down" size={15} />
+          </button>
+          <button
+            type="button"
+            className="dc-rail-btn"
+            title="Duplicate"
+            aria-label="Duplicate this message"
+            onClick={(event) => {
+              event.stopPropagation();
+              edit.duplicate(message.id);
+            }}
+          >
+            <Icon name="copy-text" size={15} />
+          </button>
+          <button
+            type="button"
+            className="dc-rail-btn dc-rail-danger"
+            title="Delete"
+            aria-label="Delete this message"
+            onClick={(event) => {
+              event.stopPropagation();
+              edit.remove(message.id);
+            }}
+          >
+            <Icon name="delete" size={15} />
+          </button>
+        </div>
+      ) : null}
+
       {message.pinned ? <div className="dc-pin-flag">Pinned</div> : null}
       {/* The bar the client floats over a message you are pointing at. Drawn
           when the mockup asks for it, because it is in most screenshots. */}

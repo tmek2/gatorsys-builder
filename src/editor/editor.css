@@ -14,14 +14,15 @@
   background: var(--g-ground);
 }
 
-/* Two columns, not three. The inspector was a permanent 380px of controls
-   sitting beside a mockup that wanted the room; it is a drawer over the canvas
-   now, opened from the island. */
+/* One column, where there were three. The mockup was squeezed between a list
+   of messages on the left and a form on the right, both of which described the
+   thing in the middle rather than being it. The list is the canvas now, and
+   the form only appears for the two things that need one. */
 .e-body {
   display: grid;
   flex: 1;
   min-height: 0;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 /* --------------------------------------------------------------- topbar */

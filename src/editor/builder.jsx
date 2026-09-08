@@ -2,11 +2,20 @@
 
 /* The builder.
  *
- * Three columns on a desktop: the outline of what is in the mockup, the
- * mockup itself, and the inspector for whatever is selected. On a phone the
- * same three become one column with a bar at the bottom that switches between
- * them, because a three-column tool on a 390px screen is three unusable
- * columns rather than one usable one.
+ * One column, and the mockup is the editor.
+ *
+ * It used to be three: a list of the messages on the left, the mockup in the
+ * middle, and a form describing it on the right. Both side columns were about
+ * the thing between them rather than being it, and the mockup — which is the
+ * whole product — got whatever width they left over.
+ *
+ * So the list is the canvas, where a message is selected, reordered,
+ * duplicated and deleted on the message itself; the words are edited where
+ * they are drawn; and the composer island at the foot of the stage is how a
+ * message is written, the way a message is written in Discord. Only an embed
+ * and a container still get a form, because only they are structures rather
+ * than properties, and it slides in beside the canvas rather than living
+ * there.
  *
  * The project is one piece of state and every change goes through `commit`,
  * which is also what pushes onto the undo stack. Nothing writes to the project
@@ -16,8 +25,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   IconArrowBackUp,
-  IconArrowDown,
-  IconArrowUp,
   IconArrowForwardUp,
   IconCheck,
   IconChevronDown,
@@ -26,8 +33,6 @@ import {
   IconDeviceFloppy,
   IconDownload,
   IconFileText,
-  IconGripVertical,
-  IconLayoutList,
   IconMoodSmile,
   IconPalette,
   IconPhotoDown,
@@ -71,7 +76,6 @@ import { ID } from "@/lib/ids";
 import { Palette } from "./palette";
 import { useCanvasGestures } from "./use-canvas";
 import { Sheet } from "./sheet";
-import { useReorder } from "./use-reorder";
 import "./editor.css";
 import "./composer.css";
 
@@ -112,7 +116,6 @@ export function Builder({ user, canSignIn = true, shared = null }) {
   const stage = useRef(null);
   const importer = useRef(null);
   const scroller = useRef(null);
-  const outline = useRef(null);
   const [room, setRoom] = useState(0);
 
   const notify = useCallback(
@@ -353,6 +356,36 @@ export function Builder({ user, canSignIn = true, shared = null }) {
         commit((p) => ({ ...p, canvas: { ...p.canvas, channel: { ...p.canvas.channel, name } } }), "channel:name"),
       topic: (topic) =>
         commit((p) => ({ ...p, canvas: { ...p.canvas, channel: { ...p.canvas.channel, topic } } }), "channel:topic"),
+      move: (id, by) =>
+        commit((p) => {
+          const i = p.messages.findIndex((m) => m.id === id);
+          const to = i + by;
+          if (i === -1 || to < 0 || to >= p.messages.length) return p;
+          const messages = [...p.messages];
+          const [held] = messages.splice(i, 1);
+          messages.splice(to, 0, held);
+          return { ...p, messages };
+        }),
+      duplicate: (id) =>
+        commit((p) => {
+          const i = p.messages.findIndex((m) => m.id === id);
+          if (i === -1) return p;
+          const copy = reid(p.messages[i]);
+          /* A copy that kept the reply would draw a second spine pointing at
+             the same message, which the client never does. */
+          copy.reply = "";
+          return { ...p, messages: [...p.messages.slice(0, i + 1), copy, ...p.messages.slice(i + 1)] };
+        }),
+      remove: (id) =>
+        commit((p) => {
+          if (p.messages.length <= 1) return p;
+          return {
+            ...p,
+            messages: p.messages
+              .filter((m) => m.id !== id)
+              .map((m) => (m.reply === id ? { ...m, reply: "" } : m)),
+          };
+        }),
     }),
     [commit],
   );
@@ -360,8 +393,10 @@ export function Builder({ user, canSignIn = true, shared = null }) {
   /* Whether the drawer over the canvas is showing. Picking a tool opens it on
      that tab; pressing the tool that is already showing closes it again, which
      is the behaviour of every dock somebody has used before. */
-  const [dockOpen, setDockOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [trayOpen, setTrayOpen] = useState(false);
   const dock = useRef(null);
+  const dockOpen = panelOpen || trayOpen;
 
   /* The drawer covers the bottom of the stage, and the canvas is positioned by
      scroll rather than by centring — `.e-stage-pad` is always taller than the
@@ -637,7 +672,6 @@ export function Builder({ user, canSignIn = true, shared = null }) {
       : 1;
   const shown = zoomShown * fit;
 
-  const rows = useReorder({ count: project.messages.length, onMove: reorder });
   /* The same travelling indicator the site's header has, twice: on the rail
      and on the tabs. One shape moving reads as one control; five backgrounds
      fading in and out read as five. */
@@ -793,232 +827,11 @@ export function Builder({ user, canSignIn = true, shared = null }) {
         </div>
       </SiteNav>
 
+      {/* One column. The mockup is the editor: a message is selected, reordered,
+          duplicated, deleted and edited on the canvas, and the two structures
+          that need a real form — an embed and a container — get a panel that
+          slides in beside it. */}
       <div className="e-body" data-pane={pane}>
-        {/* ------------------------------------------------------ left */}
-        <aside className="e-left">
-          {/* The left column is the message list and nothing else. It used to
-              carry a five-way rail whose other four entries swapped out the
-              inspector, which made "edit this message" and "edit the members"
-              mutually exclusive for no reason. */}
-          <header className="e-left-head">
-            <h2>Messages</h2>
-            <span className="e-left-count">{project.messages.length}</span>
-          </header>
-
-          {true ? (
-            <div className="e-outline">
-              <ol className="e-outline-list" ref={outline}>
-                {project.messages.map((m, i) => {
-                  const author = project.users.find((u) => u.id === m.user);
-                  const summary =
-                    m.kind === "system"
-                      ? `${m.systemType ?? "system"} notice`
-                      : m.content?.split("\n")[0].slice(0, 46) ||
-                        (m.embeds?.length
-                          ? `${m.embeds.length} embed${m.embeds.length > 1 ? "s" : ""}`
-                          : "") ||
-                        (m.components?.length ? "Components" : "") ||
-                        "Empty message";
-                  const held = rows.drag?.index === i && rows.drag.held;
-                  const landing = rows.drag?.index === i && rows.drag.landing;
-                  const shift = rows.offsetFor(i, 46);
-                  return (
-                    <li
-                      key={m.id}
-                      data-row
-                      className="e-outline-item"
-                      data-held={held ? "true" : "false"}
-                      data-landing={landing ? "true" : "false"}
-                      /* The held row moves with the pointer and the rest slide
-                         one slot out of its way. Both are transforms, so the
-                         list never reflows while it is being rearranged. */
-                      style={{
-                        transform: shift ? `translateY(${shift}px)` : undefined,
-                        /* Only the displaced rows ease. The held one is glued
-                           to the pointer, and easing that is putting the row a
-                           few pixels behind the finger on purpose. */
-                        transition:
-                          held || landing
-                            ? "none"
-                            : "transform 220ms cubic-bezier(0.16, 1, 0.3, 1)",
-                        zIndex: held || landing ? 2 : undefined,
-                      }}
-                    >
-                      <button
-                        type="button"
-                        className="e-outline-row"
-                        data-on={message?.id === m.id ? "true" : "false"}
-                        onClick={() => {
-                          if (rows.drag) return;
-                          setSelected(m.id);
-                          setPane("inspector");
-                        }}
-                        {...rows.handlers(i, outline)}
-                      >
-                        {/* The handle. A span rather than a button, because a
-                            button inside a button is invalid markup — it
-                            carries pointer handlers only, and the arrow
-                            buttons below are the keyboard's way to reorder.
-                            On a touch screen it is the only way in, since
-                            dragging the row itself is how the list scrolls. */}
-                        <span
-                          className="e-grip"
-                          aria-hidden="true"
-                          {...rows.gripHandlers(i, outline)}
-                        >
-                          <IconGripVertical size={14} />
-                        </span>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          className="e-outline-face"
-                          src={author?.avatar}
-                          alt=""
-                          draggable={false}
-                        />
-                        <span className="e-outline-copy">
-                          <span className="e-outline-name">
-                            {author?.name ?? "Unknown"}
-                          </span>
-                          <span className="e-outline-text">{summary}</span>
-                        </span>
-                        <span className="e-outline-index">{i + 1}</span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ol>
-
-              <div className="e-outline-actions">
-                <Hint label="Add another message to the mockup" keys="⌘↵">
-                  <button
-                    type="button"
-                    className="e-btn e-btn-dashed"
-                    onClick={addMessage}
-                  >
-                    <IconPlus size={15} /> Add a message
-                  </button>
-                </Hint>
-                {/* Four bare glyphs at the foot of a column do not say what
-                    they act on, and one of them deletes something. Naming the
-                    row costs a line and answers it. */}
-                <div
-                  className="e-outline-tools"
-                  role="group"
-                  aria-label="Selected message"
-                >
-                  <span className="e-outline-tools-label">Selected</span>
-                  <Hint label="Move up">
-                    <button
-                      type="button"
-                      className="e-icon-btn"
-                      onClick={() => moveMessage(-1)}
-                      aria-label="Move up"
-                    >
-                      <IconArrowUp size={15} />
-                    </button>
-                  </Hint>
-                  <Hint label="Move down">
-                    <button
-                      type="button"
-                      className="e-icon-btn"
-                      onClick={() => moveMessage(1)}
-                      aria-label="Move down"
-                    >
-                      <IconArrowDown size={15} />
-                    </button>
-                  </Hint>
-                  <Hint label="Duplicate" keys="⌘D">
-                    <button
-                      type="button"
-                      className="e-icon-btn"
-                      onClick={duplicateMessage}
-                      aria-label="Duplicate"
-                    >
-                      <IconCopy size={15} />
-                    </button>
-                  </Hint>
-                  <Hint label="Delete this message">
-                    <button
-                      type="button"
-                      className="e-icon-btn"
-                      onClick={removeMessage}
-                      aria-label="Delete"
-                    >
-                      <IconTrash size={15} />
-                    </button>
-                  </Hint>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          <div className="e-left-foot">
-            {/* The header drops these two below 720px for room, and the
-                command palette that also carries them wants a keyboard. On a
-                phone this pane is where they live instead — drawn only at the
-                widths where the header is not showing them. */}
-            <div className="e-left-narrow">
-              <button
-                type="button"
-                className="e-btn e-btn-quiet"
-                onClick={() => setSheetOpen("templates")}
-              >
-                <IconStack2 size={15} /> Templates
-              </button>
-              <button
-                type="button"
-                className="e-btn e-btn-quiet"
-                onClick={doShare}
-              >
-                <IconShare2 size={15} /> Share a link
-              </button>
-              <button
-                type="button"
-                className="e-btn e-btn-quiet"
-                onClick={() => setPaletteOpen(true)}
-              >
-                <IconSettings size={15} /> All commands
-              </button>
-            </div>
-            <button
-              type="button"
-              className="e-btn e-btn-quiet"
-              onClick={() => importer.current?.click()}
-            >
-              <IconDownload size={15} style={{ transform: "rotate(180deg)" }} />{" "}
-              Import a project
-            </button>
-            <button
-              type="button"
-              className="e-btn e-btn-quiet"
-              onClick={() => exportProject(project)}
-            >
-              <IconFileText size={15} /> Download the project
-            </button>
-            <input
-              ref={importer}
-              type="file"
-              accept="application/json,.json"
-              hidden
-              onChange={importFile}
-            />
-
-            {/* The documents behind the tool. Quiet, at the bottom, out of the
-                way of everything anybody came here to press — but present on
-                every screen, which is the point of them. */}
-            <nav className="e-legal" aria-label="About this tool">
-              <Link href="/terms">Terms</Link>
-              <span aria-hidden="true">·</span>
-              <Link href="/privacy">Privacy</Link>
-              <span aria-hidden="true">·</span>
-              <a href={SUPPORT_URL} target="_blank" rel="noreferrer">
-                Support
-              </a>
-            </nav>
-          </div>
-        </aside>
-
-        {/* --------------------------------------------------- preview */}
         <main className="e-stage" data-dock={dockOpen && message ? "true" : "false"}>
           <div className="e-stage-bar e-no-export">
             {/* This said "Desktop · Ash" and did nothing, while the settings
@@ -1125,7 +938,7 @@ export function Builder({ user, canSignIn = true, shared = null }) {
           <Composer
             project={project}
             author={author}
-            tool={dockOpen ? tab : null}
+            tool={trayOpen ? "Extras" : panelOpen ? tab : null}
             channel={project.canvas.channel?.name}
             onPickAuthor={(id) => {
               setSendAs(id);
@@ -1135,51 +948,102 @@ export function Builder({ user, canSignIn = true, shared = null }) {
             onAddAuthor={addUser}
             onSend={sendMessage}
             onTool={(id) => {
-              setDockOpen((open) => !(open && tab === id));
-              setTab(id);
+              if (id === "Extras") {
+                setPanelOpen(false);
+                setTrayOpen((open) => !open);
+              } else {
+                setTrayOpen(false);
+                setPanelOpen((open) => !(open && tab === id));
+                setTab(id);
+              }
               setPane("inspector");
             }}
           />
 
-          {/* --------------------------------------------------- dock */}
+          {/* ------------------------------------------------- editors */}
 
-          {/* What used to be a permanent 380px column on the right. It is a
-              drawer over the canvas now, opened by the rail on the island and
-              closed by pressing the same button again or Escape — so the
-              mockup has the whole window when you are looking at it, and the
-              controls are one press away when you are not. */}
-          {message && dockOpen ? (
+          {/* Two surfaces, because the two kinds of editing are not alike. An
+              embed or a container is a structure with a dozen fields, so it
+              gets a panel that slides in beside the mockup and stays there
+              while you work through it. Everything else a message can carry is
+              a thing you either have or do not, so it gets a tray of tiles
+              that rises from the island, the way the client's own sticker and
+              GIF pickers do. */}
+          <aside
+            ref={dock}
+            className="c-panel e-no-export"
+            data-open={panelOpen ? "true" : "false"}
+            aria-hidden={!panelOpen}
+            aria-label={`${tab} editor`}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.stopPropagation();
+                setPanelOpen(false);
+              }
+            }}
+          >
+            <header className="c-panel-head">
+              <nav className="c-dock-tabs" aria-label="Editor">
+                {["Embeds", "Components"].map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    className="c-dock-tab"
+                    data-on={tab === t ? "true" : "false"}
+                    onClick={() => setTab(t)}
+                  >
+                    {t}
+                    {t === "Embeds" && message?.embeds?.length ? (
+                      <span className="e-tab-count">{message.embeds.length}</span>
+                    ) : null}
+                    {t === "Components" && message?.components?.length ? (
+                      <span className="e-tab-count">{message.components.length}</span>
+                    ) : null}
+                  </button>
+                ))}
+              </nav>
+              <span className="c-dock-spacer" />
+              <Hint label="Close" keys="Esc">
+                <button
+                  type="button"
+                  className="e-icon-btn"
+                  onClick={() => setPanelOpen(false)}
+                  aria-label="Close the editor panel"
+                  tabIndex={panelOpen ? undefined : -1}
+                >
+                  <IconX size={16} />
+                </button>
+              </Hint>
+            </header>
+            <div className="c-panel-body" key={tab}>
+              {message ? (
+                <Inspector
+                  tab={tab === "Embeds" || tab === "Components" ? tab : "Embeds"}
+                  message={message}
+                  project={project}
+                  commit={commit}
+                  patch={patchMessage}
+                  onManageMembers={() => setSheetOpen("members")}
+                  onError={fail}
+                  onNotify={notify}
+                />
+              ) : null}
+            </div>
+          </aside>
+
+          {trayOpen && message ? (
             <section
-              ref={dock}
-              className="c-dock e-no-export"
-              aria-label={`${tab} settings`}
+              className="c-tray e-no-export"
+              aria-label="Everything this message can carry"
               onKeyDown={(event) => {
                 if (event.key === "Escape") {
                   event.stopPropagation();
-                  setDockOpen(false);
+                  setTrayOpen(false);
                 }
               }}
             >
-              <header className="c-dock-head">
-                <nav className="c-dock-tabs" aria-label="Message parts">
-                  {TABS.map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      className="c-dock-tab"
-                      data-on={tab === t ? "true" : "false"}
-                      onClick={() => setTab(t)}
-                    >
-                      {t}
-                      {t === "Embeds" && message?.embeds?.length ? (
-                        <span className="e-tab-count">{message.embeds.length}</span>
-                      ) : null}
-                      {t === "Components" && message?.components?.length ? (
-                        <span className="e-tab-count">{message.components.length}</span>
-                      ) : null}
-                    </button>
-                  ))}
-                </nav>
+              <header className="c-tray-head">
+                <h2>Add to this message</h2>
                 <span className="c-dock-spacer" />
                 <Hint label="Copy this message&rsquo;s payload">
                   <button type="button" className="e-btn e-btn-quiet" onClick={copyJson}>
@@ -1190,17 +1054,16 @@ export function Builder({ user, canSignIn = true, shared = null }) {
                   <button
                     type="button"
                     className="e-icon-btn"
-                    onClick={() => setDockOpen(false)}
-                    aria-label="Close the editor panel"
+                    onClick={() => setTrayOpen(false)}
+                    aria-label="Close the tray"
                   >
                     <IconX size={16} />
                   </button>
                 </Hint>
               </header>
-
-              <div className="c-dock-body" key={tab}>
+              <div className="c-tray-body">
                 <Inspector
-                  tab={tab}
+                  tab="Extras"
                   message={message}
                   project={project}
                   commit={commit}
@@ -1210,41 +1073,11 @@ export function Builder({ user, canSignIn = true, shared = null }) {
                   onNotify={notify}
                 />
               </div>
-
-              <footer className="c-dock-foot">
-                <button
-                  type="button"
-                  className="e-btn e-btn-quiet"
-                  onClick={() => exportMessageJson(message, project.name)}
-                >
-                  <IconDownload size={14} /> Download the message JSON
-                </button>
-              </footer>
             </section>
           ) : null}
+
         </main>
       </div>
-
-      {/* The phone's pane switcher. Below 1080px the three columns are one, and
-          this is what moves between them. */}
-      <nav className="e-panes e-no-export" aria-label="Panes">
-        {[
-          { id: "outline", label: "Outline", Icon: IconLayoutList },
-          { id: "preview", label: "Preview", Icon: IconPhotoDown },
-          { id: "inspector", label: "Edit", Icon: IconSettings },
-        ].map(({ id, label, Icon }) => (
-          <button
-            key={id}
-            type="button"
-            className="e-pane"
-            data-on={pane === id ? "true" : "false"}
-            onClick={() => setPane(id)}
-          >
-            <Icon size={18} stroke={1.8} />
-            {label}
-          </button>
-        ))}
-      </nav>
 
       {/* The four things that are not the message you are editing. Each is a
           sheet over the editor rather than a panel that replaces it, so what

@@ -493,24 +493,56 @@ export function Row({ children, gap = 8 }) {
   );
 }
 
-export function Group({ title, action, children, collapsible = false, open: openProp = true }) {
+export function Group({
+  title,
+  action,
+  children,
+  collapsible = false,
+  open: openProp = true,
+  /** A glyph for the tile grid; ignored by the plain stacked layout. */
+  icon = null,
+  /** Whether the thing this group configures is currently on the message. */
+  on = null,
+}) {
   const [open, setOpen] = useState(openProp);
   return (
-    <section className="e-group" data-open={open ? "true" : "false"}>
+    <section
+      className="e-group"
+      data-open={open ? "true" : "false"}
+      data-on={on === null ? undefined : on ? "true" : "false"}
+    >
       <header className="e-group-head">
         {collapsible ? (
-          <button type="button" className="e-group-toggle" onClick={() => setOpen((v) => !v)}>
+          <button
+            type="button"
+            className="e-group-toggle"
+            aria-expanded={open}
+            onClick={() => setOpen((v) => !v)}
+          >
+            {icon ? <span className="e-group-icon">{icon}</span> : null}
             <svg className="e-group-caret" width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="m7 10 5 5 5-5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
             {title}
+            {on ? <span className="e-group-dot" aria-label="on" /> : null}
           </button>
         ) : (
-          <span className="e-group-title">{title}</span>
+          <span className="e-group-title">
+            {icon ? <span className="e-group-icon">{icon}</span> : null}
+            {title}
+          </span>
         )}
         {action}
       </header>
-      {open ? <div className="e-group-body">{children}</div> : null}
+      {/* The body stays mounted and the wrapper animates between 0fr and 1fr,
+          which is how you transition to a height nobody has measured. Removing
+          it from the tree instead would snap, and measuring it in JavaScript
+          would fight every field inside that changes its own height. */}
+      <div className="e-group-wrap" aria-hidden={!open}>
+        <div className="e-group-body" inert={open ? undefined : ""}>
+          {children}
+        </div>
+      </div>
     </section>
   );
 }

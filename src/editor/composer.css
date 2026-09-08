@@ -302,15 +302,75 @@
   .c-bar-tools .c-bar-btn:not(:last-child) { display: none; }
 }
 
-/* ------------------------------------------------------------------ dock */
+/* ------------------------------------------------------------- side panel */
 
-/* The inspector, as a drawer over the canvas rather than a column beside it.
+/* Embeds and containers only. They are structures with a dozen fields each,
+   so they get a panel that stays open beside the mockup while you work through
+   it rather than a popover that covers what you are editing.
  *
- * It rises from the island and stops well short of the top of the stage, so
- * the mockup stays visible above it while you are editing: the point of
- * putting the controls over the picture is that you can see what the control
- * did without looking away. */
-.c-dock {
+ * It slides rather than appears, and it is always in the tree: a panel that is
+ * mounted only while open cannot animate out, and half of what makes a drawer
+ * read as a drawer is watching it leave. */
+.c-panel {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  width: min(420px, 42vw);
+  border: 1px solid var(--mac-hairline);
+  border-radius: 18px;
+  background: var(--mac-pane-bg);
+  box-shadow: var(--mac-lift-high);
+  overflow: hidden;
+  transform: translateX(calc(100% + 24px));
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    transform 380ms cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 240ms ease,
+    visibility 0s linear 380ms;
+}
+.c-panel[data-open="true"] {
+  transform: none;
+  opacity: 1;
+  visibility: visible;
+  transition:
+    transform 420ms cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 200ms ease,
+    visibility 0s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .c-panel { transition: opacity 120ms ease, visibility 0s; }
+}
+
+.c-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--g-line);
+}
+.c-panel-body {
+  flex: 1;
+  min-height: 0;
+  padding: 14px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ------------------------------------------------------------------ tray */
+
+/* Everything else a message can carry. Not a panel, because none of these is a
+   structure you work through — each is a thing the message either has or does
+   not, so the useful shape is a board of them where what is already on is
+   visible at a glance rather than a list you scroll to find out. */
+.c-tray {
   position: absolute;
   left: 50%;
   bottom: 80px;
@@ -319,34 +379,73 @@
   display: flex;
   flex-direction: column;
   width: min(1080px, calc(100% - 48px));
-  max-height: min(62dvh, 620px);
+  max-height: min(58dvh, 560px);
   border: 1px solid var(--mac-hairline);
   border-radius: 20px;
   background: var(--mac-pane-bg);
   box-shadow: var(--mac-lift-high);
   overflow: hidden;
-  animation: c-dock-rise 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  animation: c-tray-rise 320ms cubic-bezier(0.32, 0.72, 0, 1);
 }
-@keyframes c-dock-rise {
-  from { opacity: 0; transform: translateX(-50%) translateY(16px); }
+@keyframes c-tray-rise {
+  from { opacity: 0; transform: translateX(-50%) translateY(28px) scale(0.97); }
   to { opacity: 1; transform: translateX(-50%); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .c-dock { animation: none; }
+  .c-tray { animation: none; }
 }
 
-.c-dock-head {
+.c-tray-head {
   display: flex;
   align-items: center;
   gap: 8px;
   flex: none;
-  padding: 10px 12px;
+  padding: 12px 14px;
   border-bottom: 1px solid var(--g-line);
 }
+.c-tray-head h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--g-ink-faint);
+}
+
+/* A board, not a column. Each extra is a card that sits closed at its title
+   and grows in place when you open it — `masonry` where the browser has it, so
+   an open card does not leave a hole beside a closed one. */
+/* The Inspector returns a fragment, so the cards are direct children of this
+   element and the grid belongs here rather than on a wrapper that is not
+   there. */
+.c-tray-body {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(272px, 1fr));
+  align-content: start;
+  align-items: start;
+  flex: 1;
+  min-height: 0;
+  padding: 14px;
+  overflow-y: auto;
+}
+.c-tray-body .e-group {
+  margin: 0;
+  transition: border-color 200ms ease, box-shadow 200ms ease;
+}
+.c-tray-body .e-group[data-on="true"] {
+  border-color: var(--g-accent-line);
+  box-shadow: 0 0 0 1px var(--g-accent-line);
+}
+/* An open card takes the whole row: its fields need the width, and a card that
+   grew inside one column would be a column of squeezed controls. */
+.c-tray-body .e-group[data-open="true"] {
+  grid-column: 1 / -1;
+}
+
 .c-dock-spacer {
   flex: 1;
 }
-
 .c-dock-tabs {
   display: flex;
   align-items: center;
@@ -378,36 +477,7 @@
   color: var(--g-accent-ink);
 }
 
-/* Two columns of controls, because a drawer is wide where a column was tall —
-   the same fields in one long strip would put the last of them a scroll away
-   for no reason. */
-.c-dock-body {
-  flex: 1;
-  min-height: 0;
-  padding: 16px;
-  overflow-y: auto;
-  columns: 2;
-  column-gap: 16px;
-}
-.c-dock-body > * {
-  break-inside: avoid;
-}
-
-.c-dock-foot {
-  display: flex;
-  justify-content: flex-end;
-  flex: none;
-  padding: 10px 12px;
-  border-top: 1px solid var(--g-line);
-}
-
-@media (max-width: 1180px) {
-  .c-dock-body { columns: 1; }
-}
 @media (max-width: 860px) {
-  .c-dock {
-    width: calc(100% - 24px);
-    bottom: 68px;
-    max-height: 58dvh;
-  }
+  .c-panel { width: calc(100% - 24px); }
+  .c-tray { width: calc(100% - 24px); bottom: 68px; }
 }

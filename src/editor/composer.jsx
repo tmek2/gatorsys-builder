@@ -20,9 +20,9 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   IconChevronDown,
   IconLayoutGrid,
-  IconMoodSmile,
   IconPencil,
   IconPlus,
+  IconSparkles,
   IconSquaresFilled,
 } from "@tabler/icons-react";
 import { Icon } from "@/discord/icon";
@@ -31,10 +31,9 @@ import { Hint } from "./fields";
 /* What the right rail opens. The labels are the words somebody would use for
    the thing they want to add, not the names of our tabs. */
 export const TOOLS = [
-  { id: "Content", label: "Message", hint: "Text, author, timestamp and how it is drawn", Glyph: IconPencil },
   { id: "Embeds", label: "Embeds", hint: "The cards a bot posts under a message", Glyph: IconLayoutGrid },
   { id: "Components", label: "Components", hint: "Buttons, menus, containers and galleries", Glyph: IconSquaresFilled },
-  { id: "Extras", label: "Extras", hint: "Reactions, attachments, polls, replies and the rest", Glyph: IconMoodSmile },
+  { id: "Extras", label: "Extras", hint: "Reactions, attachments, polls, the profile card and the rest", Glyph: IconSparkles },
 ];
 
 /** The pill that says who you are sending as, and the popover behind it. */
