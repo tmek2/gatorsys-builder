@@ -37,6 +37,7 @@ import {
   IconStack2,
   IconTrash,
   IconUsers,
+  IconX,
   IconZoomIn,
   IconZoomOut,
 } from "@tabler/icons-react";
@@ -44,13 +45,15 @@ import Link from "next/link";
 import { SiteNav } from "@/gator/site-nav";
 import { Blob, useBlob } from "@/gator/blob";
 import { DiscordSurface } from "@/discord/surface";
-import { PHONE_WIDTH, blankProject, newMessage, reid, uid } from "@/lib/model";
+import { avatarUrl } from "@/lib/avatars";
+import { PHONE_WIDTH, blankProject, newMessage, newUser, reid, uid } from "@/lib/model";
 import { nextStamp, restamp } from "@/lib/clock";
 import { TEMPLATES } from "@/lib/templates";
 import { SUPPORT_URL } from "@/lib/site";
 import { loadValue, saveValue } from "@/lib/storage";
 import { migrate, validProject } from "@/lib/validate";
 import { Hint } from "./fields";
+import { Composer } from "./composer";
 import { Inspector, TABS } from "./inspector";
 import { CanvasPanel, EmojiPanel, UsersPanel } from "./panels";
 import { BackupsPanel } from "./backups-panel";
@@ -70,6 +73,7 @@ import { useCanvasGestures } from "./use-canvas";
 import { Sheet } from "./sheet";
 import { useReorder } from "./use-reorder";
 import "./editor.css";
+import "./composer.css";
 
 /* A hover label, with the shortcut where there is one. Every control that is
    an icon alone needs one — an icon is a guess until something names it — and
@@ -329,6 +333,76 @@ export function Builder({ user, canSignIn = true, shared = null }) {
     setSheetOpen(null);
   }, []);
 
+  /* Editing the mockup by editing the mockup: the message text, its timestamp,
+     the channel name and its topic are all changed where they are drawn. The
+     bundle is memoised because it reaches every message through context, and a
+     new object each render would undo the memo on the row. */
+  const edit = useMemo(
+    () => ({
+      content: (id, content) =>
+        commit(
+          (p) => ({ ...p, messages: p.messages.map((m) => (m.id === id ? { ...m, content } : m)) }),
+          `m:${id}:content`,
+        ),
+      stamp: (id, timestamp) =>
+        commit(
+          (p) => ({ ...p, messages: p.messages.map((m) => (m.id === id ? { ...m, timestamp } : m)) }),
+          `m:${id}:timestamp`,
+        ),
+      channel: (name) =>
+        commit((p) => ({ ...p, canvas: { ...p.canvas, channel: { ...p.canvas.channel, name } } }), "channel:name"),
+      topic: (topic) =>
+        commit((p) => ({ ...p, canvas: { ...p.canvas, channel: { ...p.canvas.channel, topic } } }), "channel:topic"),
+    }),
+    [commit],
+  );
+
+  /* Whether the drawer over the canvas is showing. Picking a tool opens it on
+     that tab; pressing the tool that is already showing closes it again, which
+     is the behaviour of every dock somebody has used before. */
+  const [dockOpen, setDockOpen] = useState(false);
+  const dock = useRef(null);
+
+  /* The drawer covers the bottom of the stage, and the canvas is positioned by
+     scroll rather than by centring — `.e-stage-pad` is always taller than the
+     stage, so no amount of padding moves what is on screen. So opening the
+     drawer scrolls the mockup up by half of it, and closing scrolls back by
+     exactly what was applied. Keeping the amount that was applied rather than
+     recomputing it means a drawer that changed height in between cannot leave
+     the canvas drifting. */
+  const dockShift = useRef(0);
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const want = dockOpen && message ? Math.round((dock.current?.offsetHeight ?? 520) / 2) + 24 : 0;
+    const delta = want - dockShift.current;
+    if (!delta) return;
+    dockShift.current = want;
+    el.scrollBy({ top: delta, behavior: "smooth" });
+  }, [dockOpen, message]);
+
+
+  /* Adding a member from the island. It selects the new person as well as
+     making them, because somebody who just pressed "add a member" wants to
+     send as them — otherwise the next thing they have to do is go and find the
+     pill again. */
+  const addUser = useCallback(() => {
+    const made = newUser({
+      avatar: avatarUrl(project.users.length * 7),
+      name: `Member ${project.users.length + 1}`,
+    });
+    commit((p) => ({ ...p, users: [...p.users, made] }));
+    setSendAs(made.id);
+    setSheetOpen("members");
+  }, [commit, project.users.length]);
+
+  /* Who the island is sending as. It follows the selected message so that
+     picking one on the canvas and typing continues that person's run, and a
+     deliberate switch in the pill sticks until the next one. */
+  const [sendAs, setSendAs] = useState(null);
+  const author =
+    project.users.find((u) => u.id === (sendAs ?? message?.user)) ?? project.users[0];
+
   const patchMessage = useCallback(
     (over) => {
       if (!message) return;
@@ -346,6 +420,23 @@ export function Builder({ user, canSignIn = true, shared = null }) {
       );
     },
     [commit, message],
+  );
+
+  /* Enter in the island. The same thing "Add a message" does, except the text
+     is already written — which is the whole point of typing into a chat rather
+     than adding an empty row and then finding the box to fill in. */
+  const sendMessage = useCallback(
+    (content) => {
+      const author = sendAs ?? message?.user ?? project.users[0].id;
+      const next = newMessage(author, {
+        content,
+        timestamp: nextStamp(project.messages) ?? "Today at 10:00",
+      });
+      commit((p) => ({ ...p, messages: [...p.messages, next] }));
+      setSelected(next.id);
+      setSheetOpen(null);
+    },
+    [commit, message, project.messages, project.users, sendAs],
   );
 
   const addMessage = useCallback(() => {
@@ -928,7 +1019,7 @@ export function Builder({ user, canSignIn = true, shared = null }) {
         </aside>
 
         {/* --------------------------------------------------- preview */}
-        <main className="e-stage">
+        <main className="e-stage" data-dock={dockOpen && message ? "true" : "false"}>
           <div className="e-stage-bar e-no-export">
             {/* This said "Desktop · Ash" and did nothing, while the settings
                 it described lived behind a rail item called "Canvas". It is
@@ -1023,91 +1114,115 @@ export function Builder({ user, canSignIn = true, shared = null }) {
                   selectedId={message?.id}
                   onSelect={pickOnCanvas}
                   innerRef={stage}
+                  edit={edit}
                 />
               </div>
             </div>
           </div>
-        </main>
 
-        {/* ------------------------------------------------- inspector */}
-        <aside className="e-right">
-          <header className="e-right-head">
-            <h2>Message</h2>
-            {message ? (
-              <Hint label="Copy this message&rsquo;s payload">
+          {/* The editor is a chat now: you write a message and press Enter,
+              and the thing you just made is the thing in front of you. */}
+          <Composer
+            project={project}
+            author={author}
+            tool={dockOpen ? tab : null}
+            channel={project.canvas.channel?.name}
+            onPickAuthor={(id) => {
+              setSendAs(id);
+              if (message) patchMessage({ user: id });
+            }}
+            onEditAuthor={() => setSheetOpen("members")}
+            onAddAuthor={addUser}
+            onSend={sendMessage}
+            onTool={(id) => {
+              setDockOpen((open) => !(open && tab === id));
+              setTab(id);
+              setPane("inspector");
+            }}
+          />
+
+          {/* --------------------------------------------------- dock */}
+
+          {/* What used to be a permanent 380px column on the right. It is a
+              drawer over the canvas now, opened by the rail on the island and
+              closed by pressing the same button again or Escape — so the
+              mockup has the whole window when you are looking at it, and the
+              controls are one press away when you are not. */}
+          {message && dockOpen ? (
+            <section
+              ref={dock}
+              className="c-dock e-no-export"
+              aria-label={`${tab} settings`}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.stopPropagation();
+                  setDockOpen(false);
+                }
+              }}
+            >
+              <header className="c-dock-head">
+                <nav className="c-dock-tabs" aria-label="Message parts">
+                  {TABS.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      className="c-dock-tab"
+                      data-on={tab === t ? "true" : "false"}
+                      onClick={() => setTab(t)}
+                    >
+                      {t}
+                      {t === "Embeds" && message?.embeds?.length ? (
+                        <span className="e-tab-count">{message.embeds.length}</span>
+                      ) : null}
+                      {t === "Components" && message?.components?.length ? (
+                        <span className="e-tab-count">{message.components.length}</span>
+                      ) : null}
+                    </button>
+                  ))}
+                </nav>
+                <span className="c-dock-spacer" />
+                <Hint label="Copy this message&rsquo;s payload">
+                  <button type="button" className="e-btn e-btn-quiet" onClick={copyJson}>
+                    <IconCopy size={14} /> Copy JSON
+                  </button>
+                </Hint>
+                <Hint label="Close" keys="Esc">
+                  <button
+                    type="button"
+                    className="e-icon-btn"
+                    onClick={() => setDockOpen(false)}
+                    aria-label="Close the editor panel"
+                  >
+                    <IconX size={16} />
+                  </button>
+                </Hint>
+              </header>
+
+              <div className="c-dock-body" key={tab}>
+                <Inspector
+                  tab={tab}
+                  message={message}
+                  project={project}
+                  commit={commit}
+                  patch={patchMessage}
+                  onManageMembers={() => setSheetOpen("members")}
+                  onError={fail}
+                  onNotify={notify}
+                />
+              </div>
+
+              <footer className="c-dock-foot">
                 <button
                   type="button"
                   className="e-btn e-btn-quiet"
-                  onClick={copyJson}
+                  onClick={() => exportMessageJson(message, project.name)}
                 >
-                  <IconCopy size={14} /> Copy JSON
+                  <IconDownload size={14} /> Download the message JSON
                 </button>
-              </Hint>
-            ) : null}
-          </header>
-
-          {message ? (
-            <nav
-              className="e-tabs"
-              aria-label="Message parts"
-              {...tabBlob.boxProps}
-            >
-              <Blob />
-              {TABS.map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  className="e-tab"
-                  data-on={tab === t ? "true" : "false"}
-                  onClick={() => setTab(t)}
-                  {...tabBlob.register(t)}
-                >
-                  {t}
-                  {t === "Embeds" && message?.embeds?.length ? (
-                    <span className="e-tab-count">{message.embeds.length}</span>
-                  ) : null}
-                  {t === "Components" && message?.components?.length ? (
-                    <span className="e-tab-count">
-                      {message.components.length}
-                    </span>
-                  ) : null}
-                </button>
-              ))}
-            </nav>
+              </footer>
+            </section>
           ) : null}
-
-          <div className="e-right-body" key={tab}>
-            {message ? (
-              <Inspector
-                tab={tab}
-                message={message}
-                project={project}
-                commit={commit}
-                patch={patchMessage}
-                onManageMembers={() => setSheetOpen("members")}
-                onError={fail}
-                onNotify={notify}
-              />
-            ) : (
-              <div className="e-right-empty">
-                <p>No message selected.</p>
-                <p>Pick one on the left, or add a new one.</p>
-              </div>
-            )}
-          </div>
-
-          {message ? (
-            <footer className="e-right-foot">
-              <button
-                type="button"
-                className="e-btn e-btn-quiet"
-                onClick={() => exportMessageJson(message, project.name)}
-              >
-                <IconDownload size={14} /> Download the message JSON
-              </button>
-            </footer>
-          ) : null}
-        </aside>
+        </main>
       </div>
 
       {/* The phone's pane switcher. Below 1080px the three columns are one, and

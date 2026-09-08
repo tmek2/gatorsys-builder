@@ -14,11 +14,14 @@
   background: var(--g-ground);
 }
 
+/* Two columns, not three. The inspector was a permanent 380px of controls
+   sitting beside a mockup that wanted the room; it is a drawer over the canvas
+   now, opened from the island. */
 .e-body {
   display: grid;
   flex: 1;
   min-height: 0;
-  grid-template-columns: 280px minmax(0, 1fr) 380px;
+  grid-template-columns: 280px minmax(0, 1fr);
 }
 
 /* --------------------------------------------------------------- topbar */
@@ -112,7 +115,7 @@
 .e-titlebar-backups:hover,
 .e-titlebar-backups:focus-visible {
   border-color: var(--g-line-strong);
-  background: var(--g-surface-2);
+  background: var(--g-fill-2);
   color: var(--g-ink);
 }
 
@@ -459,6 +462,9 @@
 
 .e-stage {
   display: flex;
+  /* The composer island is absolutely placed over the canvas, so the stage is
+     what it is placed against. */
+  position: relative;
   min-width: 0;
   /* A grid item's automatic minimum is its content, so without this the stage
      refuses to be shorter than the canvas inside it and grows past the bottom

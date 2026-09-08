@@ -13,7 +13,7 @@
  * hard to name and impossible to unsee.
  */
 
-import { memo, useContext } from "react";
+import { memo, useContext, useRef, useState } from "react";
 import { Markdown } from "./markdown";
 import { RenderContext } from "./context";
 import { Embed } from "./embed";
@@ -21,6 +21,8 @@ import { Blocks } from "./components";
 import { Attachments, Invite, LinkPreview, Poll, Sticker, VoiceNote } from "./media";
 import { Reactions } from "./reactions";
 import { Icon } from "./icon";
+import { InlineText } from "./inline";
+import { StampPicker } from "./stamp-picker";
 import { HoverToolbar } from "./toolbar";
 import { ProfileCard } from "./profile";
 import { SystemMessage } from "./system";
@@ -128,7 +130,9 @@ function ThreadTag({ thread }) {
 }
 
 function MessageRow({ message, replyTo, selected, onSelect }) {
-  const { users } = useContext(RenderContext);
+  const { users, edit } = useContext(RenderContext);
+  const [stamping, setStamping] = useState(false);
+  const clock = useRef(null);
   const user = users.find((u) => u.id === message.user) ?? users[0];
 
   if (message.kind === "system") {
@@ -187,14 +191,62 @@ function MessageRow({ message, replyTo, selected, onSelect }) {
         {grouped ? null : (
           <div className="dc-meta">
             <Author user={user} />
-            <time className="dc-time">{message.timestamp}</time>
+            {edit ? (
+              <span className="dc-time-slot">
+                <time
+                  ref={clock}
+                  className="dc-time dc-time-live"
+                  role="button"
+                  tabIndex={0}
+                  title="Click to set the day and time"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setStamping((v) => !v);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      setStamping((v) => !v);
+                    }
+                  }}
+                >
+                  {message.timestamp}
+                </time>
+                {stamping ? (
+                  <StampPicker
+                    value={message.timestamp}
+                    onChange={(next) => edit.stamp(message.id, next)}
+                    onClose={() => setStamping(false)}
+                    anchor={clock}
+                  />
+                ) : null}
+              </span>
+            ) : (
+              <time className="dc-time">{message.timestamp}</time>
+            )}
             {message.tts ? <span className="dc-flag">TTS</span> : null}
           </div>
         )}
 
-        {message.content ? (
+        {message.content || edit ? (
           <div className="dc-content">
-            <Markdown text={message.content} />
+            {edit ? (
+              /* Rendered as markdown until you double-click it, then the raw
+                 text — because the thing being edited is the markdown, and
+                 showing the rendered form in the field would be a lie about
+                 what you are typing. */
+              <InlineText
+                value={message.content}
+                onChange={(next) => edit.content(message.id, next)}
+                multiline
+                label="Message text"
+                placeholder="Empty message"
+                render={() => <Markdown text={message.content} />}
+              />
+            ) : (
+              <Markdown text={message.content} />
+            )}
             {message.edited ? <span className="dc-edited">(edited)</span> : null}
           </div>
         ) : message.edited ? (

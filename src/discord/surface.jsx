@@ -20,6 +20,7 @@
 import { useCallback, useMemo } from "react";
 import { RenderContext } from "./context";
 import { Icon } from "./icon";
+import { InlineText } from "./inline";
 import { Message } from "./message";
 import { DateDivider, NewDivider } from "./system";
 import "./tokens.css";
@@ -72,13 +73,23 @@ function ChannelList({ canvas }) {
   );
 }
 
-function ChannelHeader({ canvas, mobile }) {
+function ChannelHeader({ canvas, mobile, edit }) {
   if (mobile) {
     return (
-      <header className="dc-m-head" aria-hidden="true">
+      <header className="dc-m-head">
         <Icon name="caret-left" size={22} className="dc-m-back" />
         <Icon name="channel-text" size={20} className="dc-hash" />
-        <span className="dc-m-head-name">{canvas.channel?.name || "general"}</span>
+        <span className="dc-m-head-name">
+          {edit ? (
+            <InlineText
+              value={canvas.channel?.name || "general"}
+              onChange={edit.channel}
+              label="Channel name"
+            />
+          ) : (
+            canvas.channel?.name || "general"
+          )}
+        </span>
         <span className="dc-m-head-tools">
           {/* A text channel's header has threads, pins and search. The call
               button belongs to a DM and a voice channel, not to this. */}
@@ -90,13 +101,29 @@ function ChannelHeader({ canvas, mobile }) {
     );
   }
   return (
-    <header className="dc-head" aria-hidden="true">
+    <header className="dc-head">
       <Icon name="channel-text" size={20} className="dc-hash" />
-      <span className="dc-head-name">{canvas.channel?.name || "general"}</span>
+      <span className="dc-head-name">
+        {edit ? (
+          <InlineText
+            value={canvas.channel?.name || "general"}
+            onChange={edit.channel}
+            label="Channel name"
+          />
+        ) : (
+          canvas.channel?.name || "general"
+        )}
+      </span>
       {canvas.channel?.topic ? (
         <>
           <span className="dc-head-rule" />
-          <span className="dc-head-topic">{canvas.channel.topic}</span>
+          <span className="dc-head-topic">
+            {edit ? (
+              <InlineText value={canvas.channel.topic} onChange={edit.topic} label="Channel topic" />
+            ) : (
+              canvas.channel.topic
+            )}
+          </span>
         </>
       ) : null}
     </header>
@@ -186,7 +213,7 @@ function Typing({ names }) {
 
 /* ------------------------------------------------------------- surface */
 
-export function DiscordSurface({ project, selectedId, onSelect, innerRef }) {
+export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit }) {
   const canvas = project.canvas ?? {};
   const mobile = canvas.platform === "mobile";
 
@@ -199,8 +226,8 @@ export function DiscordSurface({ project, selectedId, onSelect, innerRef }) {
      character. The one thing that needed it was resolving a reply, and the
      stream can do that once on the way past. */
   const ctx = useMemo(
-    () => ({ users: project.users ?? [], emojis: project.emojis ?? [] }),
-    [project.users, project.emojis],
+    () => ({ users: project.users ?? [], emojis: project.emojis ?? [], edit }),
+    [project.users, project.emojis, edit],
   );
 
   /* One handler for the whole stream, reading the id off the row it fired on.
@@ -273,7 +300,7 @@ export function DiscordSurface({ project, selectedId, onSelect, innerRef }) {
         {canvas.chrome === "full" && !mobile ? <ChannelList canvas={canvas} /> : null}
 
         <div className="dc-main">
-          {canvas.chrome !== "none" ? <ChannelHeader canvas={canvas} mobile={mobile} /> : null}
+          {canvas.chrome !== "none" ? <ChannelHeader canvas={canvas} mobile={mobile} edit={edit} /> : null}
           {/* With no chrome the canvas sets its own inset — but only the
               vertical half of it goes on the scroller. The horizontal half is
               handed down as `--dc-edge` and added to each message's own
