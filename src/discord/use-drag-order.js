@@ -24,7 +24,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 /** Pixels before a press becomes a drag rather than a click. */
 const SLOP = 5;
 
-export function useDragOrder({ onMove, scroller }) {
+export function useDragOrder({ onMove, scrollers = [] }) {
   const [drag, setDrag] = useState(null);
   const state = useRef(null);
   const move = useRef(onMove);
@@ -39,7 +39,7 @@ export function useDragOrder({ onMove, scroller }) {
       if (!s.started) {
         if (Math.abs(dy) < SLOP) return;
         s.started = true;
-        if (scroller?.current && !raf) raf = window.requestAnimationFrame(creep);
+        if (scrollers.length && !raf) raf = window.requestAnimationFrame(creep);
       }
       /* How many rows the pointer is now below, not counting the one in hand.
          That count IS the insertion index, because the list the row lands in
@@ -50,34 +50,48 @@ export function useDragOrder({ onMove, scroller }) {
       for (let i = 0; i < s.rows.length; i += 1) {
         if (i !== s.from && event.clientY > s.rows[i].mid) to += 1;
       }
-      if (to !== s.to || !drag) {
+      if (to !== s.to || !s.published) {
         s.to = to;
+        s.published = true;
         setDrag({ from: s.from, to, dy });
       }
     };
 
-    /* Held against the top or bottom edge, the canvas scrolls itself. Without
-       it a mockup taller than the window can only be reordered as far as the
-       screen reaches, which for a long conversation is most of the way to
-       useless. Speed ramps with how far into the edge the pointer is, so a
-       nudge creeps and a firm hold moves. */
+    /* Held against the top or bottom edge, the view scrolls itself. Without it
+       a conversation taller than its frame can only be reordered as far as the
+       screen reaches, which for a long one is most of the way to useless.
+       Speed ramps with how far into the edge the pointer is, so a nudge creeps
+       and a firm hold moves.
+     *
+       Which view, though, depends on what is actually too tall. The frame has
+       a maximum now, so a long mockup scrolls inside itself while the stage
+       around it does not move at all — and a creep aimed at the stage sat
+       there doing nothing. So the candidates are tried in order, innermost
+       first, and the first one with room in the direction being asked for is
+       the one that moves. */
     let raf = 0;
     const EDGE = 56;
     const creep = () => {
       raf = 0;
       const s = state.current;
-      const view = scroller?.current;
-      if (!s?.started || !view) return;
-      const r = view.getBoundingClientRect();
-      let by = 0;
-      if (s.pointer < r.top + EDGE) by = -Math.ceil((r.top + EDGE - s.pointer) / 4);
-      else if (s.pointer > r.bottom - EDGE) by = Math.ceil((s.pointer - (r.bottom - EDGE)) / 4);
-      if (by) {
+      if (!s?.started) return;
+      for (const ref of scrollers) {
+        const view = ref?.current;
+        if (!view) continue;
+        const r = view.getBoundingClientRect();
+        let by = 0;
+        if (s.pointer < r.top + EDGE) by = -Math.ceil((r.top + EDGE - s.pointer) / 4);
+        else if (s.pointer > r.bottom - EDGE) by = Math.ceil((s.pointer - (r.bottom - EDGE)) / 4);
+        if (!by) continue;
+        const room =
+          by < 0 ? view.scrollTop > 0 : view.scrollTop < view.scrollHeight - view.clientHeight - 1;
+        if (!room) continue;
         view.scrollTop += by;
         /* The rows moved under the pointer, so the midpoints measured at the
            start have to move with them or the landing slot drifts. */
         for (const row of s.rows) row.mid -= by;
         onMoveEvent({ clientY: s.pointer });
+        break;
       }
       raf = window.requestAnimationFrame(creep);
     };
@@ -100,7 +114,16 @@ export function useDragOrder({ onMove, scroller }) {
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
     };
-  }, [drag, scroller]);
+    /* Deliberately not depending on `drag`.
+     *
+       It was in here so the first move could publish a state that equalled the
+       start, and it cost the whole gesture: the effect tore down and rebuilt on
+       every frame of the drag, and the rebuild cancelled the animation frame
+       driving the edge scroll and never started another — so holding a row
+       against the top of a long conversation sat there doing nothing. Whether
+       anything has been published is a fact about the drag, so it lives on the
+       drag. */
+  }, [scrollers]);
 
   const start = useCallback((event, index, root) => {
     if (event.button !== 0) return;

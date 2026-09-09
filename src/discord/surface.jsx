@@ -264,7 +264,11 @@ export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit, 
     },
     [edit, onSelect],
   );
-  const order = useDragOrder({ onMove: (from, to) => edit?.reorder(from, to), scroller });
+  /* Innermost first: a long conversation scrolls inside its own frame, and
+     only when that has nowhere left to go does the stage behind it move. */
+  const conversation = useRef(null);
+  const views = useMemo(() => [conversation, scroller].filter(Boolean), [scroller]);
+  const order = useDragOrder({ onMove: (from, to) => edit?.reorder(from, to), scrollers: views });
 
   const byId = useMemo(
     () => new Map((project.messages ?? []).map((m) => [m.id, m])),
@@ -341,6 +345,7 @@ export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit, 
               width of the column the way the client does, rather than
               stopping short of the edge. */}
           <div
+            ref={conversation}
             className="dc-scroll"
             style={
               canvas.chrome === "none"
