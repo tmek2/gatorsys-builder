@@ -127,6 +127,75 @@
   background: var(--background-mod-normal);
   color: var(--text-strong);
 }
+
+/* The controls on a channel row: switch the mockup to it, or take it away.
+   Held at zero width until the row is hovered so a channel list still reads
+   as a channel list, and dropped from the export like every other control. */
+.dc-sidebar-channel .dc-sidebar-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 130ms ease;
+}
+.dc-sidebar-channel:hover .dc-sidebar-tools,
+.dc-sidebar-channel:focus-within .dc-sidebar-tools {
+  opacity: 1;
+}
+.dc-sidebar-tools button {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.dc-sidebar-tools button:hover:not(:disabled) {
+  background: var(--background-mod-strong);
+  color: var(--text-default);
+}
+.dc-sidebar-tools button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* One more row at the end of the list, quiet until you look for it. */
+.dc-sidebar-add {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 30px;
+  margin-top: 2px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  opacity: 0.55;
+  cursor: pointer;
+  transition: opacity 130ms ease, background 130ms ease;
+}
+.dc-sidebar-add:hover {
+  background: var(--background-mod-normal);
+  opacity: 1;
+}
+
+/* The server's icon, when it is a control. */
+.dc-rail-live {
+  cursor: pointer;
+}
+.dc-rail-live:hover {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--g-accent, #f7a8c4) 55%, transparent);
+}
 .dc-hash {
   color: var(--text-muted);
   flex: none;

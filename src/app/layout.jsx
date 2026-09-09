@@ -53,14 +53,23 @@ export const metadata = {
   /* The SVG is the one browsers should use; the .ico is there because they
      ask for /favicon.ico anyway — including on an error page, where the
      document's own links may never render — and a 404 in the console is
-     noise somebody has to rule out later. */
+     noise somebody has to rule out later.
+     
+     The touch icon is separate and deliberately not transparent. iOS does not
+     composite a transparent home-screen or bookmark icon onto the page's
+     colours — it composites it onto black — so a pink drawing on nothing came
+     out as a pink drawing on a black tile. This one brings its own ground.
+     iOS rounds the corners itself, so the square stays square. */
   icons: {
     icon: [
       { url: "/favicon.svg", type: "image/svg+xml" },
-      { url: "/favicon.ico", sizes: "16x16 32x32 48x48" },
+      { url: "/favicon.ico", sizes: "16x16 24x24 32x32 48x48 64x64" },
+      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
     ],
     shortcut: "/favicon.ico",
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
+  manifest: "/manifest.webmanifest",
 };
 
 export const viewport = {

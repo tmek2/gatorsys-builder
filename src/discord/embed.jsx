@@ -16,6 +16,7 @@
 
 import { Markdown, MarkdownInline, formatTime } from "./markdown";
 import { safeMedia, safeUrl } from "@/lib/urls";
+import { ImageDrop, ImageTools } from "./image-tools";
 
 /* How wide one field sits, in twelfths.
  *
@@ -40,7 +41,7 @@ function footerTime(value) {
   return Number.isNaN(date.getTime()) ? value : formatTime(Math.floor(date.getTime() / 1000), "f");
 }
 
-export function Embed({ embed }) {
+export function Embed({ embed, set }) {
   const fields = embed.fields ?? [];
   /* Every URL out of the embed is checked before it becomes an attribute. An
      embed can arrive from somebody else — a share link, an imported file, a
@@ -117,13 +118,42 @@ export function Embed({ embed }) {
         </div>
 
         {thumbnail ? (
-          <img className="dc-embed-thumb" src={thumbnail} alt="" draggable={false} />
+          <span className="dc-embed-thumb-slot">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="dc-embed-thumb" src={thumbnail} alt="" draggable={false} />
+            {set ? (
+              <ImageTools
+                value={embed.thumbnail}
+                label="thumbnail"
+                onChange={(v) => set({ thumbnail: v })}
+                onRemove={() => set({ thumbnail: "" })}
+              />
+            ) : null}
+          </span>
         ) : null}
       </div>
 
-      {image ? <img className="dc-embed-image" src={image} alt="" draggable={false} /> : null}
-      {video && !image ? (
-        <video className="dc-embed-image" src={video} controls playsInline />
+      {image || video ? (
+        <span className="dc-embed-image-slot">
+          {image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className="dc-embed-image" src={image} alt="" draggable={false} />
+          ) : (
+            <video className="dc-embed-image" src={video} controls playsInline />
+          )}
+          {set ? (
+            <ImageTools
+              value={image ? embed.image : embed.video}
+              label={image ? "image" : "video"}
+              onChange={(v) => set(image ? { image: v } : { video: v })}
+              onRemove={() => set(image ? { image: "" } : { video: "" })}
+            />
+          ) : null}
+        </span>
+      ) : null}
+
+      {set && !image && !video ? (
+        <ImageDrop label="an image" onChange={(v) => set({ image: v })} />
       ) : null}
 
       {embed.footer || embed.timestamp ? (

@@ -52,7 +52,7 @@ import Link from "next/link";
 import { SiteNav } from "@/gator/site-nav";
 import { DiscordSurface } from "@/discord/surface";
 import { avatarUrl } from "@/lib/avatars";
-import { PHONE_HEIGHT, PHONE_WIDTH, blankProject, newAttachment, newMessage, newUser, reid, uid } from "@/lib/model";
+import { PHONE_HEIGHT, PHONE_WIDTH, blankProject, newAttachment, newGift, newMessage, newRole, newUser, reid, uid } from "@/lib/model";
 import { nextStamp, restamp } from "@/lib/clock";
 import { TEMPLATES } from "@/lib/templates";
 import { SUPPORT_URL } from "@/lib/site";
@@ -349,10 +349,30 @@ export function Builder({ user, canSignIn = true, shared = null }) {
           (p) => ({ ...p, messages: p.messages.map((m) => (m.id === id ? { ...m, content } : m)) }),
           `m:${id}:content`,
         ),
+      /* Any field of one message, from wherever it is drawn. This is what the
+         controls painted on top of a picture use: swapping an attachment is a
+         patch of `attachments`, taking an embed's image away is a patch of
+         `embeds`, and neither should need a form. */
+      patch: (id, over, tag) =>
+        commit(
+          (p) => ({ ...p, messages: p.messages.map((m) => (m.id === id ? { ...m, ...over } : m)) }),
+          tag ? `m:${id}:${tag}` : undefined,
+        ),
       stamp: (id, timestamp) =>
         commit(
           (p) => ({ ...p, messages: p.messages.map((m) => (m.id === id ? { ...m, timestamp } : m)) }),
           `m:${id}:timestamp`,
+        ),
+      /* Any one setting of the canvas, from wherever it happens to be drawn.
+         The client's own furniture — the catch-up bar's count, who is typing,
+         the server's name, the list of channels — is all canvas state, and all
+         of it is now edited on the picture rather than in a form. Tagged per
+         key so typing into one of them is one undo step and not one per
+         letter. */
+      canvas: (over, tag) =>
+        commit(
+          (p) => ({ ...p, canvas: { ...p.canvas, ...over } }),
+          `canvas:${tag ?? Object.keys(over).sort().join(",")}`,
         ),
       channel: (name) =>
         commit((p) => ({ ...p, canvas: { ...p.canvas, channel: { ...p.canvas.channel, name } } }), "channel:name"),
@@ -382,6 +402,60 @@ export function Builder({ user, canSignIn = true, shared = null }) {
           (p) => ({ ...p, users: p.users.map((u) => (u.id === id ? { ...u, tag } : u)) }),
           `u:${id}:tag`,
         ),
+      /* The member list is a list, so it can be rearranged like one. Discord
+         orders by role and then alphabetically; a mockup orders by whatever
+         the person making it wants to be true. */
+      reorderMember: (fromId, toId) =>
+        commit((p) => {
+          const from = p.users.findIndex((u) => u.id === fromId);
+          const to = p.users.findIndex((u) => u.id === toId);
+          if (from === -1 || to === -1 || from === to) return p;
+          const users = [...p.users];
+          const [held] = users.splice(from, 1);
+          users.splice(to, 0, held);
+          return { ...p, users };
+        }),
+      addMember: () => addUser(),
+      /* Roles are the server's, not a member's: recolouring one recolours
+         everybody who has it. */
+      role: (id, over) =>
+        commit(
+          (p) => ({ ...p, roles: (p.roles ?? []).map((r) => (r.id === id ? { ...r, ...over } : r)) }),
+          `role:${id}:${Object.keys(over).sort().join(",")}`,
+        ),
+      addRole: (userId) =>
+        commit((p) => {
+          const role = newRole({ name: `Role ${(p.roles?.length ?? 0) + 1}` });
+          return {
+            ...p,
+            roles: [...(p.roles ?? []), role],
+            users: userId
+              ? p.users.map((u) => (u.id === userId ? { ...u, roles: [...(u.roles ?? []), role.id] } : u))
+              : p.users,
+          };
+        }),
+      /* Taking a role off one member, which is not the same as deleting it. */
+      dropRole: (userId, roleId) =>
+        commit((p) => ({
+          ...p,
+          users: p.users.map((u) =>
+            u.id === userId ? { ...u, roles: (u.roles ?? []).filter((r) => r !== roleId) } : u,
+          ),
+        })),
+      giveRole: (userId, roleId) =>
+        commit((p) => ({
+          ...p,
+          users: p.users.map((u) =>
+            u.id === userId && !(u.roles ?? []).includes(roleId)
+              ? { ...u, roles: [...(u.roles ?? []), roleId] }
+              : u,
+          ),
+        })),
+      /* The server's own settings, opened from the server's own icon. */
+      server: () => {
+        setAvatarFor(null);
+        setSheetOpen("appearance");
+      },
       member: (id) => {
         setFocusUser(id ?? null);
         setAvatarFor(null);
@@ -476,6 +550,29 @@ export function Builder({ user, canSignIn = true, shared = null }) {
   const dock = useRef(null);
   const dockOpen = panelOpen || trayOpen;
 
+  /* Press outside and they go away. The tray held its ground over the mockup
+     until you found its X, which is not how any picker in the client behaves
+     — or any menu on this page. The island is excepted because it is how you
+     opened the thing and how you switch between them. */
+  useEffect(() => {
+    if (!panelOpen && !trayOpen) return undefined;
+    const away = (event) => {
+      const el = event.target;
+      if (!(el instanceof Element)) return;
+      if (el.closest(".c-tray, .c-panel, .c-island")) return;
+      /* Anything a control of theirs opened on the body — a select's menu, a
+         colour picker, our own right-click menu — is still inside them as far
+         as somebody using it is concerned. */
+      if (el.closest("[data-radix-popper-content-wrapper], .dc-menu, .e-sheet-scrim, .e-palette-scrim")) {
+        return;
+      }
+      setTrayOpen(false);
+      setPanelOpen(false);
+    };
+    document.addEventListener("pointerdown", away);
+    return () => document.removeEventListener("pointerdown", away);
+  }, [panelOpen, trayOpen]);
+
   /* The drawer covers the bottom of the stage, and the canvas is positioned by
      scroll rather than by centring — `.e-stage-pad` is always taller than the
      stage, so no amount of padding moves what is on screen. So opening the
@@ -557,21 +654,31 @@ export function Builder({ user, canSignIn = true, shared = null }) {
      four costumes. Each adds its thing to the selected message and opens the
      tray on it, so you can see what landed and change it. */
   const addToMessage = useCallback(
-    (what) => {
+    /* What the client's own buttons do, rather than four faces on one button.
+       Each one adds the thing it is a picture of, with the file already in it
+       — the picker handed it over — and nothing opens a panel to say so. The
+       tray is for the things a message can carry that have no button. */
+    (what, src = "") => {
       if (!message) return;
+      const attach = (over) =>
+        patchMessage({ attachments: [...(message.attachments ?? []), newAttachment(over)] });
+
       if (what === "attachment") {
-        patchMessage({
-          attachments: [...(message.attachments ?? []), newAttachment({ kind: "image" })],
-        });
+        attach({ kind: "image", src });
       } else if (what === "gif") {
-        patchMessage({
-          attachments: [...(message.attachments ?? []), newAttachment({ kind: "image", name: "tenor.gif" })],
-        });
+        /* Named so the client's own GIF badge is drawn on it. A GIF in a
+           mockup is an attachment that says it came from Tenor. */
+        attach({ kind: "image", name: "tenor.gif", src });
       } else if (what === "sticker") {
-        patchMessage({ sticker: message.sticker ?? { name: "Sticker", src: "" } });
+        patchMessage({ sticker: { name: message.sticker?.name || "Sticker", src } });
+      } else if (what === "gift") {
+        /* The gift button opens Nitro gifting in the client, which is not a
+           thing to draw — but the message it *produces* is, and that is what
+           somebody making a mockup of "here, have Nitro" is after. */
+        patchMessage({ gift: message.gift ?? newGift() });
+      } else if (what === "file") {
+        attach({ kind: "file", name: "document.pdf", src });
       }
-      setPanelOpen(false);
-      setTrayOpen(true);
     },
     [message, patchMessage],
   );

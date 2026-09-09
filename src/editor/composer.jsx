@@ -29,6 +29,8 @@ import { Blob, useBlob } from "@/gator/blob";
 import { Icon } from "@/discord/icon";
 import { Hint } from "./fields";
 import { EmojiInsert } from "./emoji-picker";
+import { fitWithin } from "@/lib/image";
+import { safeMedia } from "@/lib/urls";
 
 /* What the right rail opens. The labels are the words somebody would use for
    the thing they want to add, not the names of our tabs. */
@@ -37,6 +39,119 @@ export const TOOLS = [
   { id: "Components", label: "Components", hint: "Buttons, menus, containers and galleries", Glyph: IconSquaresFilled },
   { id: "Extras", label: "Extras", hint: "Reactions, attachments, polls, the profile card and the rest", Glyph: IconSparkles },
 ];
+
+/* One of the client's own composer buttons, doing the thing it is a picture
+ * of. Without `what` it is a plain button — the gift takes no file. With it,
+ * pressing opens a small sheet offering the two ways anybody ever has a
+ * picture: a file on this machine, or a link to one.
+ *
+ * Not a file input on its own, because half the time the picture is already
+ * on the internet and browsing for it is the wrong question.
+ */
+function MediaPick({ icon, label, hint, what, accept = "image/*", size = 20, onPick }) {
+  const [open, setOpen] = useState(false);
+  const [link, setLink] = useState("");
+  const [busy, setBusy] = useState(false);
+  const box = useRef(null);
+  const file = useRef(null);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const away = (event) => {
+      if (!box.current?.contains(event.target)) setOpen(false);
+    };
+    const key = (event) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        setOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", away);
+    document.addEventListener("keydown", key);
+    return () => {
+      document.removeEventListener("pointerdown", away);
+      document.removeEventListener("keydown", key);
+    };
+  }, [open]);
+
+  if (!what) {
+    return (
+      <Hint label={hint}>
+        <button type="button" className="c-bar-btn" onClick={() => onPick()} aria-label={label}>
+          <Icon name={icon} size={size} />
+        </button>
+      </Hint>
+    );
+  }
+
+  return (
+    <span className="c-pick" ref={box}>
+      <Hint label={hint}>
+        <button
+          type="button"
+          className="c-bar-btn"
+          data-on={open ? "true" : "false"}
+          aria-label={label}
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+        >
+          <Icon name={icon} size={size} />
+        </button>
+      </Hint>
+
+      {open ? (
+        <div className="c-pick-pop" role="dialog" aria-label={`Choose ${what}`}>
+          <input
+            ref={file}
+            type="file"
+            accept={accept}
+            hidden
+            onChange={async (event) => {
+              const chosen = event.target.files?.[0];
+              event.target.value = "";
+              if (!chosen) return;
+              setBusy(true);
+              try {
+                onPick(await fitWithin(chosen));
+                setOpen(false);
+              } finally {
+                setBusy(false);
+              }
+            }}
+          />
+          <button
+            type="button"
+            className="c-pick-file"
+            disabled={busy}
+            onClick={() => file.current?.click()}
+          >
+            <Icon name="upload" size={16} />
+            {busy ? "Reading\u2026" : `Choose ${what}`}
+          </button>
+          <span className="c-pick-or">or paste a link</span>
+          <input
+            className="c-pick-link"
+            value={link}
+            placeholder="https://\u2026"
+            aria-label={`Link to ${what}`}
+            onChange={(event) => setLink(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter") return;
+              event.preventDefault();
+              /* Refused rather than drawn: a javascript: or data:text/html
+                 source in a mockup is somebody else's script inside it. */
+              if (safeMedia(link)) {
+                onPick(link);
+                setLink("");
+                setOpen(false);
+              }
+            }}
+          />
+        </div>
+      ) : null}
+    </span>
+  );
+}
 
 /** The pill that says who you are sending as, and the popover behind it. */
 function AuthorPill({ project, author, onPick, onEdit, onAdd }) {
@@ -198,11 +313,14 @@ export function Composer({
         {/* Discord's own controls, and only those. Drawn rather than wired,
             like everything else on a mockup — pressing one opens the editor
             panel that actually adds the thing. */}
-        <Hint label="Add an image, a file or a voice note to this message">
-          <button type="button" className="c-bar-btn" onClick={() => onAdd("attachment")} aria-label="Attach">
-            <Icon name="attach" size={22} />
-          </button>
-        </Hint>
+        <MediaPick
+          icon="attach"
+          label="Attach"
+          hint="Attach a picture or a file to this message"
+          size={22}
+          what="a picture"
+          onPick={(src) => onAdd("attachment", src)}
+        />
 
         <textarea
           ref={field}
@@ -222,21 +340,34 @@ export function Composer({
           }}
         />
 
-        {/* Each does its own job. They all used to open the same panel, which
-            made four buttons that were one button wearing four faces — and the
-            gift is not here at all, because Discord's gift button opens a Nitro
-            purchase and there is no such thing to draw in a mockup. */}
+        {/* Each does its own job, and the job is the thing it is a picture of.
+            They all used to open the same panel — four buttons that were one
+            button wearing four faces — and the gift was missing entirely,
+            because Discord's gift button opens a Nitro purchase and I read
+            that as "nothing to draw". What it *produces* is very much a thing
+            to draw, so it makes the card. */}
         <span className="c-bar-tools">
-          <Hint label="Add a GIF to this message">
-            <button type="button" className="c-bar-btn" onClick={() => onAdd("gif")} aria-label="GIF">
-              <Icon name="gif" size={20} />
-            </button>
-          </Hint>
-          <Hint label="Add a sticker to this message">
-            <button type="button" className="c-bar-btn" onClick={() => onAdd("sticker")} aria-label="Sticker">
-              <Icon name="sticker" size={20} />
-            </button>
-          </Hint>
+          <MediaPick
+            icon="gift"
+            label="Gift"
+            hint="Add a Nitro gift card to this message"
+            onPick={() => onAdd("gift")}
+          />
+          <MediaPick
+            icon="gif"
+            label="GIF"
+            hint="Put a GIF in this message"
+            accept="image/gif,image/webp,image/*,video/mp4,video/webm"
+            what="a GIF"
+            onPick={(src) => onAdd("gif", src)}
+          />
+          <MediaPick
+            icon="sticker"
+            label="Sticker"
+            hint="Put a sticker in this message"
+            what="a sticker"
+            onPick={(src) => onAdd("sticker", src)}
+          />
           <EmojiInsert onPick={(emoji) => setDraft((d) => d + emoji)} custom={emojis} />
         </span>
       </div>

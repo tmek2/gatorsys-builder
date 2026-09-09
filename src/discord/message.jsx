@@ -18,7 +18,7 @@ import { Markdown } from "./markdown";
 import { RenderContext } from "./context";
 import { Embed } from "./embed";
 import { Blocks } from "./components";
-import { Attachments, Invite, LinkPreview, Poll, Sticker, VoiceNote } from "./media";
+import { Attachments, Gift, Invite, LinkPreview, Poll, Sticker, VoiceNote } from "./media";
 import { Reactions } from "./reactions";
 import { Icon } from "./icon";
 import { InlineText } from "./inline";
@@ -195,7 +195,7 @@ function ThreadTag({ thread }) {
 }
 
 function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, landing, onMenu }) {
-  const { users, edit } = useContext(RenderContext);
+  const { users, roles, edit } = useContext(RenderContext);
   const [stamping, setStamping] = useState(false);
   const clock = useRef(null);
   const user = users.find((u) => u.id === message.user) ?? users[0];
@@ -417,21 +417,63 @@ function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, 
         {message.forwarded ? <ForwardCard forwarded={message.forwarded} /> : null}
 
         {message.embeds?.map((embed) => (
-          <Embed key={embed.id} embed={embed} />
+          <Embed
+            key={embed.id}
+            embed={embed}
+            set={
+              edit
+                ? (over) =>
+                    edit.patch(
+                      message.id,
+                      { embeds: message.embeds.map((e) => (e.id === embed.id ? { ...e, ...over } : e)) },
+                      `embed:${embed.id}`,
+                    )
+                : undefined
+            }
+          />
         ))}
 
         {message.linkPreview ? <LinkPreview preview={message.linkPreview} /> : null}
         {message.invite ? <Invite invite={message.invite} /> : null}
 
-        {message.attachments?.length ? <Attachments items={message.attachments} /> : null}
+        {message.attachments?.length ? (
+          <Attachments
+            items={message.attachments}
+            edit={edit ? (attachments) => edit.patch(message.id, { attachments }) : undefined}
+          />
+        ) : null}
         {message.voice ? <VoiceNote voice={message.voice} /> : null}
-        {message.sticker ? <Sticker sticker={message.sticker} /> : null}
+        {message.sticker ? (
+          <Sticker
+            sticker={message.sticker}
+            edit={edit ? (sticker) => edit.patch(message.id, { sticker }) : undefined}
+          />
+        ) : null}
+
+        {message.gift ? (
+          <Gift
+            gift={message.gift}
+            edit={edit ? (gift) => edit.patch(message.id, { gift }) : undefined}
+          />
+        ) : null}
 
         {message.components?.length ? <Blocks blocks={message.components} /> : null}
 
         {message.poll ? <Poll poll={message.poll} /> : null}
 
-        {message.profile ? <ProfileCard profile={message.profile} user={user} /> : null}
+        {message.profile ? (
+          <ProfileCard
+            profile={message.profile}
+            user={user}
+            roles={roles}
+            set={
+              edit
+                ? (over) => edit.patch(message.id, { profile: { ...message.profile, ...over } }, "profile")
+                : undefined
+            }
+            edit={edit}
+          />
+        ) : null}
         {message.reactions?.length ? <Reactions reactions={message.reactions} /> : null}
 
         {message.thread ? <ThreadTag thread={message.thread} /> : null}

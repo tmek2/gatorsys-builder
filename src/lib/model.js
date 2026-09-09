@@ -60,10 +60,40 @@ export const LIMITS = {
 
 /* ---------------------------------------------------------------- users */
 
+/* ---------------------------------------------------------------- roles
+ *
+ * A role is a server-wide thing, not a per-member one: three people share the
+ * Moderator role and all three go orange when you recolour it. Members carry
+ * ids into this list, so renaming a role renames it everywhere it is drawn —
+ * in the member list, on the profile card, and in whatever a message quotes.
+ */
+
+export const newRole = (over = {}) => ({
+  id: ID.role(),
+  name: "New role",
+  color: "#5865f2",
+  /* Discord's "display separately" flag. A hoisted role gets its own heading
+     in the member list; everybody else falls into ONLINE and OFFLINE. */
+  hoist: false,
+  ...over,
+});
+
+/** The colour a member is drawn in: the first role that has one, then their
+ *  own override, then nothing — which is the client's own order. */
+export function roleColor(user, roles = []) {
+  for (const id of user?.roles ?? []) {
+    const role = roles.find((r) => r.id === id);
+    if (role?.color) return role.color;
+  }
+  return user?.color || "";
+}
+
 export const newUser = (over = {}) => ({
   id: ID.user(),
   name: "New member",
   color: "",
+  /** Ids into the project's role list, highest first. */
+  roles: [],
   avatar: avatarUrl(0),
   bot: false,
   /* The tag beside a bot's name. Discord draws APP for an application and
@@ -77,6 +107,21 @@ export const newUser = (over = {}) => ({
   decoration: "",
   roleIcon: "",
   status: "online",
+  ...over,
+});
+
+/* ----------------------------------------------------------------- gift
+ *
+ * Discord's gift button opens a Nitro purchase, which is not a thing to draw.
+ * What it *produces* is: a claimable card in the channel, and "here, have
+ * Nitro" is a mockup people want. So the button makes the card.
+ */
+
+export const newGift = (over = {}) => ({
+  title: "You've been gifted a subscription!",
+  plan: "Nitro \u2014 1 Month",
+  button: "Accept",
+  claimed: false,
   ...over,
 });
 
@@ -268,10 +313,13 @@ export const newCanvas = (over = {}) => ({
   density: "cozy",
   /** How much of the client is drawn around the messages. */
   chrome: "none",
-  /* 720. Wide enough for an embed at its full 520px plus the avatar gutter,
-     narrow enough that a screenshot drops into a document without being
-     scaled down — which is what most of these are for. */
-  width: 720,
+  /* 1280, which is the width Discord's own desktop window opens at. It was
+     720 — chosen so a screenshot dropped into a document without being scaled
+     — and 720 is not a desktop: the server rail, the channel list and the
+     member list all have to fit beside the conversation, and at 720 they are
+     squeezed into something no real client ever looks like. The export scale
+     is the control for "make it smaller in the document", not this. */
+  width: 1280,
   /* Where the window stops growing.
    *
    * A mockup that grows a message at a time ends up a four-thousand-pixel
@@ -280,10 +328,11 @@ export const newCanvas = (over = {}) => ({
    * three-message mockup is still three messages tall; past it the
    * conversation scrolls inside the frame and the frame is what exports.
    *
-   * 760 is a plausible desktop window height. The phone ignores it and uses
-   * the device's own, because a phone is a fixed piece of hardware.
+   * 800 goes with the 1280 width: together they are the window Discord's
+   * desktop client opens at. The phone ignores both and uses the device's
+   * own, because a phone is a fixed piece of hardware.
    */
-  height: 760,
+  height: 800,
   padding: 24,
   radius: 10,
   scale: 2,
@@ -305,6 +354,7 @@ export const newCanvas = (over = {}) => ({
   showChannelStart: false,
   channelKind: "text",
   showFollow: false,
+  followText: "Follow this channel to post updates into your own server.",
   readOnly: false,
   readOnlyReason: "You do not have permission to send messages in this channel.",
   showTyping: false,
@@ -328,6 +378,7 @@ export function blankProject() {
     version: PROJECT_VERSION,
     name: "Untitled mockup",
     updatedAt: Date.now(),
+    roles: [],
     users: [bot, person],
     emojis: [],
     canvas: newCanvas(),

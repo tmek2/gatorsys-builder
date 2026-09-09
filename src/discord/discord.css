@@ -1168,6 +1168,9 @@
 /* --------------------------------------------------------------- sticker */
 
 .dc-sticker {
+  position: relative;
+  width: max-content;
+  max-width: 100%;
   margin-top: 8px;
 }
 .dc-sticker img {
@@ -1484,13 +1487,26 @@
 
 /* --------------------------------------------------------------- typing */
 
+/* Pinned under the conversation, above the composer — never a row inside the
+   scroller. The client draws it in the gap it keeps there, and it does not
+   move when the conversation does. */
 .dc-typing {
+  flex: none;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 16px;
+  min-height: 24px;
+  margin-top: -4px;
+  padding: 2px 16px 4px;
   color: var(--text-default);
   font-size: 0.875rem;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dc-mobile .dc-typing {
+  padding-inline: 12px;
 }
 .dc-typing-dots {
   display: inline-flex;
@@ -2326,4 +2342,380 @@
 .dc-inline-empty {
   opacity: 0.45;
   font-style: italic;
+}
+
+/* ------------------------------------------- changing a picture in place */
+
+/* The strip that appears over an image when the pointer is on it. Small,
+   cornered, and gone from the export — the picture is the control, so it must
+   not become part of the picture. */
+.dc-imgtools {
+  position: absolute;
+  top: 8px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 9px;
+  background: var(--background-base-lower);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), 0 8px 24px rgba(0, 0, 0, 0.3);
+  opacity: 0;
+  transform: translateY(-3px);
+  pointer-events: none;
+  transition: opacity 140ms ease, transform 220ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+.dc-imgtools[data-align="end"] {
+  right: 8px;
+}
+.dc-imgtools[data-align="start"] {
+  left: 8px;
+}
+:hover > .dc-imgtools,
+.dc-imgtools:focus-within {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+.dc-imgtools button {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+.dc-imgtools button:hover:not(:disabled),
+.dc-imgtools button[data-on="true"] {
+  background: var(--background-mod-strong);
+  color: var(--text-strong);
+}
+.dc-imgtools button[data-danger="true"]:hover {
+  background: color-mix(in srgb, var(--dc-red, #f23f43) 22%, transparent);
+  color: var(--dc-red, #f23f43);
+}
+.dc-imgtools button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* The link field grows the strip sideways rather than dropping below it. A
+   dropdown would be clipped: a gallery cell hides its overflow so the picture
+   keeps its rounded corners, and the field would have been cut in half. */
+.dc-imgtools-link {
+  display: block;
+  width: 190px;
+  max-width: 42vw;
+  margin-left: 2px;
+}
+.dc-imgtools-link input {
+  width: 100%;
+  height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--background-base-lower);
+  color: var(--text-default);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.dc-imgtools-link input:focus {
+  border-color: var(--dc-blurple, #5865f2);
+}
+
+/* A slot with nothing in it yet. */
+.dc-imgdrop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 64px;
+  padding: 12px;
+  border: 1px dashed var(--border-subtle);
+  border-radius: 8px;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 130ms ease, color 130ms ease, background 130ms ease;
+}
+.dc-imgdrop:hover {
+  border-color: var(--text-muted);
+  background: var(--background-mod-subtle);
+  color: var(--text-default);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-imgtools {
+    transition: opacity 100ms ease;
+  }
+}
+
+/* Slots that exist only to give the hover strip somewhere to live. They lay
+   out exactly as the bare image did — the grid still sees one child in the
+   thumbnail column — so nothing about the drawn embed moves. */
+.dc-embed-thumb-slot,
+.dc-embed-image-slot {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+/* The slot takes the thumbnail's place in the embed's grid and the image
+   inside it goes back to being an ordinary block, so the drawn result is
+   identical to the bare <img> it replaced. */
+.dc-embed-thumb-slot {
+  grid-column: 2;
+  grid-row: 1;
+  margin-top: 8px;
+  width: 80px;
+  height: 80px;
+}
+.dc-embed-thumb-slot .dc-embed-thumb {
+  grid-column: auto;
+  grid-row: auto;
+  margin-top: 0;
+}
+
+/* Roles on the profile card, and the two controls that manage them. */
+.dc-profile-role-drop {
+  display: none;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.dc-profile-role:hover .dc-profile-role-drop {
+  display: grid;
+}
+.dc-profile-role-drop:hover {
+  background: var(--background-mod-strong);
+  color: var(--text-strong);
+}
+.dc-profile-role-add {
+  gap: 4px;
+  border: 1px dashed var(--border-subtle);
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.dc-profile-role-add:hover {
+  border-color: var(--text-muted);
+  color: var(--text-default);
+}
+
+/* The member list, once it is a thing you can rearrange. */
+.dc-member[data-held="true"] {
+  opacity: 0.55;
+}
+.dc-member[data-landing="true"] {
+  box-shadow: inset 2px 0 0 var(--g-accent, #f7a8c4);
+}
+.dc-member-more {
+  display: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.dc-member:hover .dc-member-more,
+.dc-member:focus-within .dc-member-more {
+  display: grid;
+}
+.dc-member-more:hover {
+  background: var(--background-mod-strong);
+  color: var(--text-default);
+}
+.dc-members-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 34px;
+  margin-top: 4px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  opacity: 0.55;
+  cursor: pointer;
+  transition: opacity 130ms ease, background 130ms ease;
+}
+.dc-members-add:hover {
+  background: var(--background-mod-normal);
+  opacity: 1;
+}
+
+/* A face that is a button. Same affordance everywhere one appears: the member
+   list, the profile card, the message header. */
+.dc-avatar-live {
+  cursor: pointer;
+}
+.dc-avatar-live:hover {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--g-accent, #f7a8c4) 55%, transparent);
+}
+
+/* ---------------------------------------------------------------- gift */
+
+/* Discord's claimable gift card. A bordered panel, the gift art on the left,
+   what it is in the middle, and the button that turns into a claimed state —
+   which is the half most mockups of this are actually about. */
+.dc-gift {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: max-content;
+  max-width: 440px;
+  margin-top: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background: var(--background-base-lower);
+}
+.dc-gift-art {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  background: linear-gradient(140deg, #5865f2, #eb459e);
+  color: #fff;
+}
+.dc-gift-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.dc-gift-title {
+  color: var(--text-strong);
+  font-size: 15px;
+  font-weight: 600;
+}
+.dc-gift-plan {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.dc-gift-btn {
+  flex: none;
+  height: 32px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--dc-green, #248046);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.dc-gift-btn:disabled {
+  cursor: default;
+}
+.dc-gift-claimed .dc-gift-btn {
+  background: var(--background-mod-strong);
+  color: var(--text-muted);
+}
+.dc-gift-claimed .dc-gift-art {
+  filter: grayscale(0.7);
+  opacity: 0.7;
+}
+.dc-gift-drop {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.dc-gift:hover .dc-gift-drop {
+  display: grid;
+}
+.dc-gift-drop:hover {
+  background: var(--background-mod-strong);
+  color: var(--text-strong);
+}
+
+/* --------------------------------------------------- dragging a message */
+
+/* The line that says where the row will land. Between rows, full width of the
+   column, in the accent — one unambiguous mark rather than a wash on a row
+   that could mean above it or below it. */
+.dc-drop-line {
+  display: block;
+  height: 2px;
+  margin: 1px 0;
+  border-radius: 2px;
+  background: var(--g-accent, #f7a8c4);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--g-accent, #f7a8c4) 35%, transparent);
+}
+
+/* The row in hand. It follows the pointer, so it must not also be the thing
+   the pointer is hit-testing against, and it must sit over its neighbours. */
+.dc-message[data-held="true"],
+.dc-system[data-held="true"] {
+  opacity: 0.9;
+}
+.dc-dragging,
+.dc-dragging * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+
+/* The handle. It was a 15px glyph in the corner of a toolbar that only
+   appeared on the selected row, which is a lot of aiming for "move this one up
+   a bit". Same place, twice the target, and it says what it is. */
+.dc-rowtools-grip {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 24px;
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: grab;
+  touch-action: none;
+}
+.dc-rowtools-grip:hover {
+  background: var(--background-mod-strong);
+  color: var(--text-strong);
+}
+.dc-rowtools-grip:active {
+  cursor: grabbing;
 }

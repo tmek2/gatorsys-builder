@@ -1,0 +1,14 @@
+{
+  "name": "Gator Mockups",
+  "short_name": "Mockups",
+  "description": "Build Discord message mockups and export them as images.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0b0d",
+  "theme_color": "#0b0b0d",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

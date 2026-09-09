@@ -65,6 +65,7 @@ export const ID = {
   block: () => newId("blk"),
   button: () => newId("btn"),
   user: () => newId("usr"),
+  role: () => newId("rol"),
   embed: () => newId("emb"),
   field: () => newId("fld"),
   item: () => newId("itm"),

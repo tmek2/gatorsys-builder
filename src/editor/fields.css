@@ -824,3 +824,47 @@ textarea.e-control {
 .e-badge .dc-icon {
   flex: none;
 }
+
+/* ---------------------------------------------------------------- roles */
+
+/* One row per role a member has: its colour, its name, whether it gets its
+   own heading in the member list, and the way off. All four on one line
+   because a role is a small thing and a stack of four fields per role turns a
+   member with three of them into a page. */
+.e-roles {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.e-role {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+}
+.e-role .e-toggle {
+  margin: 0;
+}
+.e-role .e-toggle-label {
+  display: none;
+}
+.e-role-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.e-role-add > *:first-child {
+  flex: 1;
+  min-width: 0;
+}
+@media (max-width: 560px) {
+  .e-role {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .e-role .e-toggle {
+    grid-column: 1 / -1;
+  }
+  .e-role .e-toggle-label {
+    display: inline;
+  }
+}

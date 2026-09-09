@@ -24,6 +24,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 /** Pixels before a press becomes a drag rather than a click. */
 const SLOP = 5;
 
+/* While a row is in hand the whole document should say so, not just the row.
+   Set on <html> because the pointer leaves the row almost immediately — it is
+   being dragged away from it — and a cursor set on the row itself flickers
+   back to the default the moment it does. */
+function grabbing(on) {
+  if (typeof document === "undefined") return;
+  document.documentElement.classList.toggle("dc-dragging", on);
+}
+
 export function useDragOrder({ onMove, scrollers = [] }) {
   const [drag, setDrag] = useState(null);
   const state = useRef(null);
@@ -39,6 +48,12 @@ export function useDragOrder({ onMove, scrollers = [] }) {
       if (!s.started) {
         if (Math.abs(dy) < SLOP) return;
         s.started = true;
+        grabbing(true);
+        /* Only now is this a drag rather than a press, and only now is it
+           right to take the gesture off the browser. Doing it on pointerdown
+           killed text selection on every message: you could not drag across a
+           word without the row deciding you meant to move it. */
+        window.getSelection?.()?.removeAllRanges();
         if (scrollers.length && !raf) raf = window.requestAnimationFrame(creep);
       }
       /* How many rows the pointer is now below, not counting the one in hand.
@@ -50,11 +65,12 @@ export function useDragOrder({ onMove, scrollers = [] }) {
       for (let i = 0; i < s.rows.length; i += 1) {
         if (i !== s.from && event.clientY > s.rows[i].mid) to += 1;
       }
-      if (to !== s.to || !s.published) {
-        s.to = to;
-        s.published = true;
-        setDrag({ from: s.from, to, dy });
-      }
+      /* `dy` is published every frame, not only when the slot changes: the
+         held row is glued to the pointer, and a row that only moves when it
+         crosses a boundary reads as broken rather than as dragging. */
+      s.to = to;
+      s.published = true;
+      setDrag({ from: s.from, to, dy });
     };
 
     /* Held against the top or bottom edge, the view scrolls itself. Without it
@@ -99,20 +115,37 @@ export function useDragOrder({ onMove, scrollers = [] }) {
     const onUp = () => {
       if (raf) window.cancelAnimationFrame(raf);
       raf = 0;
+      grabbing(false);
       const s = state.current;
       state.current = null;
       setDrag(null);
       if (s?.started && s.to !== s.from) move.current(s.from, s.to);
     };
 
+    /* Escape puts it back. A gesture with no way out is a gesture people are
+       afraid to start. */
+    const onKey = (event) => {
+      if (event.key !== "Escape" || !state.current) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (raf) window.cancelAnimationFrame(raf);
+      raf = 0;
+      grabbing(false);
+      state.current = null;
+      setDrag(null);
+    };
+
     window.addEventListener("pointermove", onMoveEvent);
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onUp);
+    window.addEventListener("keydown", onKey, true);
     return () => {
       if (raf) window.cancelAnimationFrame(raf);
+      grabbing(false);
       window.removeEventListener("pointermove", onMoveEvent);
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onUp);
+      window.removeEventListener("keydown", onKey, true);
     };
     /* Deliberately not depending on `drag`.
      *
@@ -129,7 +162,9 @@ export function useDragOrder({ onMove, scrollers = [] }) {
     if (event.button !== 0) return;
     const node = root?.current ?? root;
     if (!node) return;
-    event.preventDefault();
+    /* Not `preventDefault` here. Until the pointer has travelled this is a
+       press, and a press on a message is a click or the start of a text
+       selection — both of which `preventDefault` on pointerdown would eat. */
     event.stopPropagation();
     const rows = [...node.children]
       .map((child) => child.querySelector("[data-id]") ?? child)
@@ -140,9 +175,31 @@ export function useDragOrder({ onMove, scrollers = [] }) {
     state.current = { from: index, to: index, y: event.clientY, rows, started: false };
   }, []);
 
+  /* Where the row would land, expressed against the list as it is *drawn* —
+     which still contains the row being dragged. The hook's own `to` is an
+     index into the list with that row taken out, and drawing a line at that
+     index is off by one for every downward move. */
+  const lineAt = drag ? (drag.to <= drag.from ? drag.to : drag.to + 1) : -1;
+
   return {
     drag,
+    lineAt,
     dragging: Boolean(drag),
+    /* Everything a row needs, so a caller cannot forget half of it: the
+       press that may become a drag, and the state that says what this row is
+       during one. */
+    rowProps: (index) => ({
+      "data-held": drag?.from === index ? "true" : undefined,
+      style:
+        drag?.from === index
+          ? {
+              transform: `translateY(${drag.dy}px)`,
+              zIndex: 5,
+              position: "relative",
+              pointerEvents: "none",
+            }
+          : undefined,
+    }),
     handlers: (index, root) => ({
       onPointerDown: (event) => start(event, index, root),
     }),

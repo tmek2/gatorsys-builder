@@ -11,6 +11,7 @@
 
 import { Icon } from "./icon";
 import { Markdown } from "./markdown";
+import { InlineText } from "./inline";
 
 /* The glyph for each kind, and the sentence the client writes. `%s` is the
  * actor's name, which is drawn in full-contrast ink inside an otherwise muted
@@ -136,11 +137,37 @@ export function NewDivider() {
 /* The blue bar the mobile client puts under the header when you come back to a
    channel that moved on without you. Tapping it jumps to the mark; the X
    dismisses it. Both are drawn, like everything else on a mockup. */
-export function UnreadBanner({ count = 25, since = "19:42" }) {
+export function UnreadBanner({ count = 25, since = "19:42", edit }) {
   return (
-    <div className="dc-unread-banner" aria-hidden="true">
+    <div className="dc-unread-banner">
       <span>
-        {count}+ new messages since {since}
+        {/* Both halves are somebody's choice, not a constant. A mockup of a
+            busy channel says a different number from a mockup of a quiet one,
+            and the time is the whole point of the bar. */}
+        {edit ? (
+          <InlineText
+            value={String(count ?? 25)}
+            onChange={(v) => {
+              const n = parseInt(v.replace(/[^0-9]/g, ""), 10);
+              edit.canvas({ unreadCount: Number.isFinite(n) && n > 0 ? Math.min(n, 9999) : 1 });
+            }}
+            label="How many new messages"
+            placeholder="1"
+          />
+        ) : (
+          count
+        )}
+        + new messages since{" "}
+        {edit ? (
+          <InlineText
+            value={since}
+            onChange={(v) => edit.canvas({ unreadSince: v })}
+            label="Since when"
+            placeholder="19:42"
+          />
+        ) : (
+          since
+        )}
       </span>
       <Icon name="close" size={16} />
     </div>
@@ -149,34 +176,65 @@ export function UnreadBanner({ count = 25, since = "19:42" }) {
 
 /* The top of a channel, which is what a real screenshot of a quiet one is
    mostly made of. */
-export function ChannelStart({ name = "general", kind = "text" }) {
+export function ChannelStart({ name = "general", kind = "text", edit }) {
+  /* The name here is the channel's own, so editing it edits the channel —
+     the header, the composer's placeholder and this heading are one thing
+     said three times, and they must not be able to disagree. */
+  const label = edit ? (
+    <InlineText value={name} onChange={edit.channel} label="Channel name" />
+  ) : (
+    name
+  );
   return (
-    <div className="dc-channel-start" aria-hidden="true">
-      <span className="dc-channel-start-mark">
+    <div className="dc-channel-start">
+      <span className="dc-channel-start-mark" aria-hidden="true">
         <Icon name={kind === "announcement" ? "channel-announcement" : "channel-text"} size={40} />
       </span>
-      <h2>Welcome to #{name}!</h2>
-      <p>This is the start of the #{name} channel.</p>
+      <h2>Welcome to #{label}!</h2>
+      <p aria-hidden="true">This is the start of the #{name} channel.</p>
     </div>
   );
 }
 
 /* An announcement channel offers to publish itself into your own server. */
-export function FollowChannel() {
+export function FollowChannel({ text, edit }) {
+  const copy = text || "Follow this channel to post updates into your own server.";
   return (
-    <div className="dc-follow" aria-hidden="true">
-      <p>Follow this channel to post updates into your own server.</p>
-      <span className="dc-follow-btn">Follow</span>
+    <div className="dc-follow">
+      <p>
+        {edit ? (
+          <InlineText
+            value={copy}
+            onChange={(v) => edit.canvas({ followText: v })}
+            label="What the follow bar says"
+            multiline
+          />
+        ) : (
+          copy
+        )}
+      </p>
+      <span className="dc-follow-btn" aria-hidden="true">Follow</span>
     </div>
   );
 }
 
 /* The composer of a channel you are only reading. */
-export function NoAccess({ reason = "You do not have permission to send messages in this channel." }) {
+export function NoAccess({ reason = "You do not have permission to send messages in this channel.", edit }) {
   return (
-    <div className="dc-no-access" aria-hidden="true">
-      <Icon name="channel-rules" size={18} />
-      <span>{reason}</span>
+    <div className="dc-no-access">
+      <Icon name="channel-rules" size={18} aria-hidden="true" />
+      <span>
+        {edit ? (
+          <InlineText
+            value={reason}
+            onChange={(v) => edit.canvas({ readOnlyReason: v })}
+            label="Why you cannot post"
+            multiline
+          />
+        ) : (
+          reason
+        )}
+      </span>
     </div>
   );
 }

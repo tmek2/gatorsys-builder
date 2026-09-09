@@ -103,3 +103,46 @@ export function readAsDataUrl(file) {
     reader.readAsDataURL(file);
   });
 }
+
+
+/* The same idea for a picture that is not a circle.
+ *
+ * An attachment, an embed's image, a profile banner: none of them are cropped
+ * to a square, but all of them arrive as whatever came off a camera. A 12MP
+ * photo dropped into a mockup is twenty times more data than the slot can
+ * show, and every byte of it goes into the project, the share link and the
+ * cloud backup. Scale it to something the largest slot can actually use and
+ * keep the shape it came in.
+ */
+export const MEDIA_SIZE = 1280;
+
+export async function fitWithin(file, max = MEDIA_SIZE) {
+  const raw = await readAsDataUrl(file);
+  if (ANIMATED.test(file.type) || VECTOR.test(file.type)) return raw;
+
+  try {
+    const img = await load(raw);
+    const w = img.naturalWidth;
+    const h = img.naturalHeight;
+    if (!w || !h) return raw;
+
+    // Never scale up. A 400px wide screenshot stays 400px wide.
+    const scale = Math.min(1, max / Math.max(w, h));
+    if (scale === 1) return raw;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(w * scale);
+    canvas.height = Math.round(h * scale);
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return raw;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    const encoded = encode(canvas, file.type);
+    return encoded.length < raw.length ? encoded : raw;
+  } catch {
+    return raw;
+  }
+}

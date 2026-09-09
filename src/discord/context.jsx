@@ -11,4 +11,4 @@ import { createContext } from "react";
  * link — and present in the builder, where it carries the handful of callbacks
  * that let the mockup be edited by editing the mockup. Absent means the canvas
  * renders as a picture, with nothing clickable in it. */
-export const RenderContext = createContext({ users: [], emojis: [], edit: null });
+export const RenderContext = createContext({ users: [], roles: [], emojis: [], edit: null });

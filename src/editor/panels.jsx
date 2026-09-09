@@ -8,9 +8,10 @@ import { useEffect, useState } from "react";
 import {
   IconPlus,
   IconTrash,
+  IconX,
 } from "@tabler/icons-react";
 import { AVATAR_COUNT, avatarUrl } from "@/lib/avatars";
-import { newUser } from "@/lib/model";
+import { newRole, newUser } from "@/lib/model";
 import {
   ColorField,
   Empty,
@@ -64,6 +65,24 @@ export function AvatarPicker({ value, onChange, onClose, inline = false }) {
 }
 
 export function UsersPanel({ project, commit, onError, focus = null, pick = null }) {
+  const roles = project.roles ?? [];
+
+  const setRole = (id, over) =>
+    commit(
+      (p) => ({ ...p, roles: (p.roles ?? []).map((r) => (r.id === id ? { ...r, ...over } : r)) }),
+      `role:${id}:${Object.keys(over).sort().join(",")}`,
+    );
+
+  const addRole = (userId) =>
+    commit((p) => {
+      const role = newRole({ name: `Role ${(p.roles?.length ?? 0) + 1}` });
+      return {
+        ...p,
+        roles: [...(p.roles ?? []), role],
+        users: p.users.map((u) => (u.id === userId ? { ...u, roles: [...(u.roles ?? []), role.id] } : u)),
+      };
+    });
+
   /* `pick` is somebody having clicked the face on the mockup. That gesture
      means "change this picture", so the set opens with the sheet rather than
      leaving a second button to find. */
@@ -113,7 +132,65 @@ export function UsersPanel({ project, commit, onError, focus = null, pick = null
             </Field>
           </Row>
 
-          <Field label="Name colour" hint="Their top coloured role. Leave empty for the default text colour.">
+          {/* Roles come first, because a role is what usually decides the
+              colour. The override below it is for the case a role cannot
+              cover: one person in a colour nobody else has. */}
+          <Field label="Roles" hint="A role is the server's, not this person's — recolouring one recolours everybody who has it.">
+            <div className="e-roles">
+              {(user.roles ?? []).map((id) => {
+                const role = roles.find((r) => r.id === id);
+                if (!role) return null;
+                return (
+                  <span className="e-role" key={id}>
+                    <ColorField
+                      value={role.color}
+                      onChange={(v) => setRole(role.id, { color: v === "none" ? "" : v })}
+                      label={`Colour of ${role.name}`}
+                    />
+                    <Text
+                      value={role.name}
+                      onChange={(v) => setRole(role.id, { name: v })}
+                      aria-label="Role name"
+                    />
+                    <Toggle
+                      label="Show separately"
+                      value={role.hoist}
+                      onChange={(v) => setRole(role.id, { hoist: v })}
+                    />
+                    <button
+                      type="button"
+                      className="e-icon-btn"
+                      aria-label={`Take ${role.name} off ${user.name}`}
+                      onClick={() => patch(user.id, { roles: (user.roles ?? []).filter((r) => r !== id) })}
+                    >
+                      <IconX size={14} />
+                    </button>
+                  </span>
+                );
+              })}
+
+              <div className="e-role-add">
+                {roles.filter((r) => !(user.roles ?? []).includes(r.id)).length ? (
+                  <Pick
+                    value=""
+                    placeholder="Give an existing role"
+                    label="Give an existing role"
+                    onChange={(id) => {
+                      if (id) patch(user.id, { roles: [...(user.roles ?? []), id] });
+                    }}
+                    options={roles
+                      .filter((r) => !(user.roles ?? []).includes(r.id))
+                      .map((r) => ({ value: r.id, label: r.name }))}
+                  />
+                ) : null}
+                <button type="button" className="e-btn e-btn-dashed" onClick={() => addRole(user.id)}>
+                  <IconPlus size={14} /> New role
+                </button>
+              </div>
+            </div>
+          </Field>
+
+          <Field label="Name colour" hint="Overrides the role colour for this one person. Leave empty to use their top coloured role.">
             <ColorField value={user.color} onChange={(v) => patch(user.id, { color: v === "none" ? "" : v })} allowNone />
           </Field>
 
@@ -314,7 +391,7 @@ export function CanvasPanel({ project, commit, onError }) {
           </Field>
         ) : (
           <Field label="Width">
-            <Slider value={canvas.width} min={320} max={1400} step={10} onChange={(v) => set("width", v)} suffix="px" />
+            <Slider value={canvas.width} min={320} max={1920} step={10} onChange={(v) => set("width", v)} suffix="px" />
           </Field>
         )}
         {/* Where the window stops growing. Below it the frame hugs the
