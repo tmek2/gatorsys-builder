@@ -30,7 +30,9 @@ import {
   IconChevronDown,
   IconCloud,
   IconCopy,
+  IconDeviceDesktop,
   IconDeviceFloppy,
+  IconDeviceMobile,
   IconDownload,
   IconFileText,
   IconMoodSmile,
@@ -50,13 +52,13 @@ import Link from "next/link";
 import { SiteNav } from "@/gator/site-nav";
 import { DiscordSurface } from "@/discord/surface";
 import { avatarUrl } from "@/lib/avatars";
-import { PHONE_WIDTH, blankProject, newAttachment, newMessage, newUser, reid, uid } from "@/lib/model";
+import { PHONE_HEIGHT, PHONE_WIDTH, blankProject, newAttachment, newMessage, newUser, reid, uid } from "@/lib/model";
 import { nextStamp, restamp } from "@/lib/clock";
 import { TEMPLATES } from "@/lib/templates";
 import { SUPPORT_URL } from "@/lib/site";
 import { loadValue, saveValue } from "@/lib/storage";
 import { migrate, validProject } from "@/lib/validate";
-import { Hint } from "./fields";
+import { Hint, Pick } from "./fields";
 import { Composer } from "./composer";
 import { Inspector, TABS } from "./inspector";
 import { CanvasPanel, EmojiPanel, UsersPanel } from "./panels";
@@ -936,23 +938,74 @@ export function Builder({ user, canSignIn = true, shared = null }) {
       <div className="e-body" data-pane={pane}>
         <main className="e-stage" data-dock={dockOpen && message ? "true" : "false"}>
           <div className="e-stage-bar e-no-export">
-            {/* This said "Desktop · Ash" and did nothing, while the settings
-                it described lived behind a rail item called "Canvas". It is
-                the button now: the label you read is the thing you press. */}
-            <Hint label="Client, appearance, background and how much of Discord is drawn">
+            {/* One control that said "Desktop · Ash" and opened a sheet holding
+                the client, the theme, the chrome, the width and eleven other
+                things. Somebody looking for "switch to phone" had to guess
+                that a palette icon and the word "Ash" led there. The three
+                anybody actually reaches for are on the bar as themselves, and
+                the rest is behind "More". */}
+            <div className="e-stage-set" role="group" aria-label="Client">
+              {[
+                { id: "desktop", label: "Desktop", Glyph: IconDeviceDesktop },
+                { id: "mobile", label: "Phone", Glyph: IconDeviceMobile },
+              ].map(({ id, label, Glyph }) => (
+                <Hint key={id} label={`Draw this mockup as ${label === "Phone" ? "a phone" : "a desktop window"}`}>
+                  <button
+                    type="button"
+                    className="e-stage-seg"
+                    data-on={(project.canvas.platform ?? "desktop") === id ? "true" : "false"}
+                    aria-pressed={(project.canvas.platform ?? "desktop") === id}
+                    onClick={() => commit((p) => ({ ...p, canvas: { ...p.canvas, platform: id } }))}
+                  >
+                    <Glyph size={15} stroke={1.8} />
+                    <span>{label}</span>
+                  </button>
+                </Hint>
+              ))}
+            </div>
+
+            <span className="e-stage-rule" />
+
+            <Hint label="Which of Discord's four themes">
+              <span className="e-stage-field">
+                <Pick
+                  value={project.canvas.theme}
+                  onChange={(v) => commit((p) => ({ ...p, canvas: { ...p.canvas, theme: v } }))}
+                  options={[
+                    { value: "light", label: "Light" },
+                    { value: "ash", label: "Ash" },
+                    { value: "dark", label: "Dark" },
+                    { value: "onyx", label: "Onyx" },
+                  ]}
+                />
+              </span>
+            </Hint>
+
+            <Hint label="How much of the client is drawn around the messages">
+              <span className="e-stage-field">
+                <Pick
+                  value={project.canvas.chrome}
+                  onChange={setChrome}
+                  options={[
+                    { value: "none", label: "Messages" },
+                    { value: "chat", label: "Channel" },
+                    { value: "full", label: "Window" },
+                  ]}
+                />
+              </span>
+            </Hint>
+
+            <Hint label="Background, size, density and the client's own notices">
               <button
                 type="button"
                 className="e-stage-appearance"
                 onClick={() => setSheetOpen("appearance")}
               >
                 <IconPalette size={15} stroke={1.8} />
-                <span>
-                  {project.canvas.platform === "mobile" ? "Phone" : "Desktop"} ·{" "}
-                  {project.canvas.theme}
-                </span>
-                <IconChevronDown size={14} stroke={2} />
+                <span>More</span>
               </button>
             </Hint>
+
             <span className="e-stage-spacer" />
             <Hint label="Zoom out">
               <button
@@ -1012,6 +1065,12 @@ export function Builder({ user, canSignIn = true, shared = null }) {
                   /* The phone is a device, not a narrow canvas: its width is the
                    iPhone's, and the width slider does not apply to it. */
                   width: phone ? PHONE_WIDTH : project.canvas.width,
+                  /* A maximum, not a height. Below it the frame hugs its
+                     content, so a three-message mockup is three messages tall
+                     and not a tall box with a hole in it; past it the
+                     conversation scrolls inside and this is the edge the
+                     export stops at. A window has a bottom. */
+                  maxHeight: phone ? PHONE_HEIGHT : project.canvas.height,
                   borderRadius: phone ? 54 : project.canvas.radius,
                   /* `zoom`, not `transform: scale()`. A transform paints the
                    element smaller and leaves its box the original size, so a

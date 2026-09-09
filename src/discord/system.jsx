@@ -130,3 +130,53 @@ export function NewDivider() {
     </div>
   );
 }
+
+/* ------------------------------------------------- the client's own notices */
+
+/* The blue bar the mobile client puts under the header when you come back to a
+   channel that moved on without you. Tapping it jumps to the mark; the X
+   dismisses it. Both are drawn, like everything else on a mockup. */
+export function UnreadBanner({ count = 25, since = "19:42" }) {
+  return (
+    <div className="dc-unread-banner" aria-hidden="true">
+      <span>
+        {count}+ new messages since {since}
+      </span>
+      <Icon name="close" size={16} />
+    </div>
+  );
+}
+
+/* The top of a channel, which is what a real screenshot of a quiet one is
+   mostly made of. */
+export function ChannelStart({ name = "general", kind = "text" }) {
+  return (
+    <div className="dc-channel-start" aria-hidden="true">
+      <span className="dc-channel-start-mark">
+        <Icon name={kind === "announcement" ? "channel-announcement" : "channel-text"} size={40} />
+      </span>
+      <h2>Welcome to #{name}!</h2>
+      <p>This is the start of the #{name} channel.</p>
+    </div>
+  );
+}
+
+/* An announcement channel offers to publish itself into your own server. */
+export function FollowChannel() {
+  return (
+    <div className="dc-follow" aria-hidden="true">
+      <p>Follow this channel to post updates into your own server.</p>
+      <span className="dc-follow-btn">Follow</span>
+    </div>
+  );
+}
+
+/* The composer of a channel you are only reading. */
+export function NoAccess({ reason = "You do not have permission to send messages in this channel." }) {
+  return (
+    <div className="dc-no-access" aria-hidden="true">
+      <Icon name="channel-rules" size={18} />
+      <span>{reason}</span>
+    </div>
+  );
+}

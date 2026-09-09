@@ -219,10 +219,25 @@ export function useCanvasGestures({ scrollerRef, zoom, setZoom }) {
     const node = scrollerRef.current;
     if (!node) return undefined;
     const onWheel = (event) => {
-      if (!event.ctrlKey && !event.metaKey) return;
+      if (event.ctrlKey || event.metaKey) {
+        event.preventDefault();
+        // Exponential, so a step feels the same size at 40% as it does at 200%.
+        setZoom((z) => Math.min(3, Math.max(0.25, z * Math.exp(-event.deltaY / 420))));
+        return;
+      }
+
+      /* A wheel inside the mockup scrolls the mockup, full stop.
+       *
+       * `overscroll-behavior: contain` on the conversation covers most of it,
+       * but only while that container still has somewhere to go: the moment it
+       * reaches an end the wheel chains out and throws the whole canvas across
+       * the editor, which is the opposite of what somebody reading to the
+       * bottom of a mockup wants. Reading a mockup and moving a mockup are
+       * different gestures and they should not share a wheel. */
+      const inner = event.target instanceof Element ? event.target.closest(".dc-scroll") : null;
+      if (!inner) return;
       event.preventDefault();
-      // Exponential, so a step feels the same size at 40% as it does at 200%.
-      setZoom((z) => Math.min(3, Math.max(0.25, z * Math.exp(-event.deltaY / 420))));
+      inner.scrollTop += event.deltaY;
     };
     node.addEventListener("wheel", onWheel, { passive: false });
     return () => node.removeEventListener("wheel", onWheel);

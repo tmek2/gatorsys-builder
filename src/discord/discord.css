@@ -16,6 +16,10 @@
 
 .dc {
   display: flex;
+  /* Fills the frame it is given, which is what turns the frame's max-height
+     into a scrolling window rather than a clipped one. */
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
   font-family: var(--font-discord), "Noto Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-size: var(--dc-font, 16px);
@@ -52,6 +56,10 @@
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  /* Scrolling inside the mockup is scrolling inside the mockup. Without this
+     the stage takes over the moment the conversation hits its end, so reading
+     to the bottom of a long mockup threw the whole canvas across the editor. */
+  overscroll-behavior: contain;
 }
 .dc-scroll > .dc-stream {
   margin-top: auto;
@@ -2048,13 +2056,15 @@
   text-align: center;
 }
 
-/* ------------------------------------------------- the message's own rail */
+/* ------------------------------------------------ the row's own controls */
 
-/* Reordering, duplicating and deleting, on the message they act on. It sits
-   outside the message's left edge so it never covers the avatar or the text,
+/* Reordering, duplicating and deleting, on the message they act on. Not
+   `dc-rail` — that is the strip of server icons in the full chrome, and
+   borrowing its name borrowed its 72px column, which is why these five buttons
+   came out stacked in a tower.
    and it is invisible until the row is pointed at — the canvas is a picture of
    Discord, and Discord has no such rail. */
-.dc-rail {
+.dc-rowtools {
   position: absolute;
   /* Inside the message, not beside it. Outside its left edge the rail looked
      better and did not work: reaching for it takes the pointer off the row
@@ -2084,19 +2094,19 @@
    for. Selection is one click and it is a thing you meant, so the controls
    follow it instead — and they still appear on hover once a row is selected,
    so moving between neighbours is not a click each time. */
-.dc-message.dc-selected > .dc-rail,
-.dc-system.dc-selected > .dc-rail,
-.dc-message:focus-within > .dc-rail,
-.dc-system:focus-within > .dc-rail {
+.dc-message.dc-selected > .dc-rowtools,
+.dc-system.dc-selected > .dc-rowtools,
+.dc-message:focus-within > .dc-rowtools,
+.dc-system:focus-within > .dc-rowtools {
   opacity: 1;
   transform: none;
   pointer-events: auto;
 }
 @media (prefers-reduced-motion: reduce) {
-  .dc-rail { transition: opacity 100ms ease; }
+  .dc-rowtools { transition: opacity 100ms ease; }
 }
 
-.dc-rail-btn {
+.dc-rowtools-btn {
   display: grid;
   width: 26px;
   height: 24px;
@@ -2108,20 +2118,20 @@
   cursor: pointer;
   transition: background 120ms ease, color 120ms ease;
 }
-.dc-rail-btn:hover,
-.dc-rail-btn:focus-visible {
+.dc-rowtools-btn:hover,
+.dc-rowtools-btn:focus-visible {
   background: var(--background-mod-normal);
   color: var(--text-strong);
 }
-.dc-rail-danger:hover,
-.dc-rail-danger:focus-visible {
+.dc-rowtools-danger:hover,
+.dc-rowtools-danger:focus-visible {
   background: color-mix(in srgb, var(--dc-red, #ed4245) 18%, transparent);
   color: var(--dc-red, #ed4245);
 }
 
 /* A touch screen has no hover, so the rail is always there on one. */
 @media (pointer: coarse) {
-  .dc-rail {
+  .dc-rowtools {
     opacity: 1;
     transform: none;
     pointer-events: auto;
@@ -2130,7 +2140,7 @@
 
 /* ------------------------------------------------------- dragging a row */
 
-.dc-rail-grip {
+.dc-rowtools-grip {
   display: grid;
   width: 22px;
   height: 24px;
@@ -2140,11 +2150,11 @@
   cursor: grab;
   touch-action: none;
 }
-.dc-rail-grip:hover {
+.dc-rowtools-grip:hover {
   background: var(--background-mod-normal);
   color: var(--text-strong);
 }
-.dc-stream[data-dragging="true"] .dc-rail-grip {
+.dc-stream[data-dragging="true"] .dc-rowtools-grip {
   cursor: grabbing;
 }
 /* Nothing should highlight while a row is being dragged — a drag that paints a

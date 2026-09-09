@@ -272,6 +272,18 @@ export const newCanvas = (over = {}) => ({
      narrow enough that a screenshot drops into a document without being
      scaled down — which is what most of these are for. */
   width: 720,
+  /* Where the window stops growing.
+   *
+   * A mockup that grows a message at a time ends up a four-thousand-pixel
+   * strip, which is not a picture of Discord — Discord is a window, and a
+   * window has a bottom edge. Below this the frame hugs its content, so a
+   * three-message mockup is still three messages tall; past it the
+   * conversation scrolls inside the frame and the frame is what exports.
+   *
+   * 760 is a plausible desktop window height. The phone ignores it and uses
+   * the device's own, because a phone is a fixed piece of hardware.
+   */
+  height: 760,
   padding: 24,
   radius: 10,
   scale: 2,
@@ -283,6 +295,18 @@ export const newCanvas = (over = {}) => ({
   showDateDivider: false,
   dateLabel: "Today",
   showNewDivider: false,
+  /* The furniture a real screenshot is full of and a mockup never had: the
+     blue catch-up bar, the top of the channel, the follow button an
+     announcement channel offers, and the composer of a channel you can only
+     read. */
+  showUnreadBanner: false,
+  unreadCount: 25,
+  unreadSince: "19:42",
+  showChannelStart: false,
+  channelKind: "text",
+  showFollow: false,
+  readOnly: false,
+  readOnlyReason: "You do not have permission to send messages in this channel.",
   showTyping: false,
   typingNames: "Someone",
   ...over,

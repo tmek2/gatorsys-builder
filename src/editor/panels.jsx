@@ -19,6 +19,7 @@ import {
   Field,
   Group,
   ImageField,
+  Num,
   Pick,
   Row,
   Segmented,
@@ -444,6 +445,58 @@ export function CanvasPanel({ project, commit, onError, onChrome }) {
           onChange={(v) => set("showNewDivider", v)}
         />
         <Toggle label="Typing indicator" value={canvas.showTyping} onChange={(v) => set("showTyping", v)} />
+        <Toggle
+          label="Catch-up bar"
+          hint="The blue rule the client puts under the header when a channel moved on without you."
+          value={canvas.showUnreadBanner}
+          onChange={(v) => set("showUnreadBanner", v)}
+        />
+        {canvas.showUnreadBanner ? (
+          <>
+            <Field label="How many missed">
+              <Num value={canvas.unreadCount} min={1} max={999} onChange={(v) => set("unreadCount", v)} />
+            </Field>
+            <Field label="Since">
+              <Text value={canvas.unreadSince} onChange={(v) => set("unreadSince", v)} placeholder="19:42" />
+            </Field>
+          </>
+        ) : null}
+        <Toggle
+          label="Top of the channel"
+          hint="The welcome heading a channel shows before its first message."
+          value={canvas.showChannelStart}
+          onChange={(v) => set("showChannelStart", v)}
+        />
+        {canvas.showChannelStart ? (
+          <Field label="Channel kind">
+            <Segmented
+              value={canvas.channelKind || "text"}
+              onChange={(v) => set("channelKind", v)}
+              label="Channel kind"
+              options={[
+                { value: "text", label: "Text" },
+                { value: "announcement", label: "Announcement" },
+              ]}
+            />
+          </Field>
+        ) : null}
+        <Toggle
+          label="Follow this channel"
+          hint="The card an announcement channel puts above the composer."
+          value={canvas.showFollow}
+          onChange={(v) => set("showFollow", v)}
+        />
+        <Toggle
+          label="Read-only channel"
+          hint="Replaces the composer with the client's own line about not being able to post."
+          value={canvas.readOnly}
+          onChange={(v) => set("readOnly", v)}
+        />
+        {canvas.readOnly ? (
+          <Field label="What it says">
+            <Text value={canvas.readOnlyReason} onChange={(v) => set("readOnlyReason", v)} />
+          </Field>
+        ) : null}
         {canvas.showTyping ? (
           <Field label="Who is typing">
             <Text value={canvas.typingNames} onChange={(v) => set("typingNames", v)} />

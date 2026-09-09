@@ -189,9 +189,9 @@ function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, 
           belong to a message, so they live on the message rather than in a
           list beside it that has to be kept in sync with what is selected. */}
       {edit ? (
-        <div className="dc-rail" aria-label="This message">
+        <div className="dc-rowtools" aria-label="This message">
           <span
-            className="dc-rail-grip"
+            className="dc-rowtools-grip"
             role="button"
             tabIndex={-1}
             aria-label="Drag to reorder"
@@ -202,7 +202,7 @@ function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, 
           </span>
           <button
             type="button"
-            className="dc-rail-btn"
+            className="dc-rowtools-btn"
             title="Move up"
             aria-label="Move this message up"
             onClick={(event) => {
@@ -214,7 +214,7 @@ function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, 
           </button>
           <button
             type="button"
-            className="dc-rail-btn"
+            className="dc-rowtools-btn"
             title="Move down"
             aria-label="Move this message down"
             onClick={(event) => {
@@ -226,7 +226,7 @@ function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, 
           </button>
           <button
             type="button"
-            className="dc-rail-btn"
+            className="dc-rowtools-btn"
             title="Duplicate"
             aria-label="Duplicate this message"
             onClick={(event) => {
@@ -238,7 +238,7 @@ function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, 
           </button>
           <button
             type="button"
-            className="dc-rail-btn dc-rail-danger"
+            className="dc-rowtools-btn dc-rowtools-danger"
             title="Delete"
             aria-label="Delete this message"
             onClick={(event) => {

@@ -486,3 +486,97 @@
     display: none;
   }
 }
+
+/* ------------------------------------------- the client's own notices */
+
+/* The catch-up bar. Blurple, full width, under the header — the one piece of
+   Discord chrome that is a solid brand colour, which is the point of it. */
+.dc-unread-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: none;
+  padding: 9px 16px;
+  background: #5865f2;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+}
+.dc-mobile .dc-unread-banner {
+  padding: 11px 16px;
+  font-size: 15px;
+}
+
+/* The top of a channel. The client draws a large outlined glyph, a heading in
+   its display weight, and one line of explanation. */
+.dc-channel-start {
+  padding: 16px 16px 8px;
+  color: var(--text-muted);
+}
+.dc-channel-start-mark {
+  display: grid;
+  width: 68px;
+  height: 68px;
+  place-items: center;
+  margin-bottom: 8px;
+  border-radius: 50%;
+  background: var(--background-mod-subtle);
+  color: var(--text-default);
+}
+.dc-channel-start h2 {
+  margin: 0 0 4px;
+  color: var(--text-strong);
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+.dc-channel-start p {
+  margin: 0;
+  font-size: 15px;
+}
+.dc-mobile .dc-channel-start h2 {
+  font-size: 26px;
+}
+
+/* Follow this channel. A card above the composer with one wide button, which
+   is how the mobile client asks. */
+.dc-follow {
+  flex: none;
+  margin: 8px 12px;
+  padding: 14px;
+  border-radius: 12px;
+  background: var(--background-mod-subtle);
+  text-align: center;
+}
+.dc-follow p {
+  margin: 0 0 12px;
+  color: var(--text-default);
+  font-size: 14px;
+  font-weight: 600;
+}
+.dc-follow-btn {
+  display: block;
+  padding: 11px;
+  border-radius: 8px;
+  background: #5865f2;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* A channel you can only read has no composer — it has a sentence saying so. */
+.dc-no-access {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: none;
+  min-height: 44px;
+  margin: 8px 16px 14px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--background-mod-subtle);
+  color: var(--text-muted);
+  font-size: 14px;
+}

@@ -24,7 +24,7 @@ import { RenderContext } from "./context";
 import { Icon } from "./icon";
 import { InlineText } from "./inline";
 import { Message } from "./message";
-import { DateDivider, NewDivider } from "./system";
+import { ChannelStart, DateDivider, FollowChannel, NewDivider, NoAccess, UnreadBanner } from "./system";
 import "./tokens.css";
 import "./discord.css";
 import "./chrome.css";
@@ -273,6 +273,9 @@ export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit, 
 
   const rows = (
     <div className="dc-stream" ref={stream} data-dragging={order.dragging ? "true" : "false"}>
+      {canvas.showChannelStart ? (
+        <ChannelStart name={canvas.channel?.name || "general"} kind={canvas.channelKind} />
+      ) : null}
       {canvas.showDateDivider ? <DateDivider label={canvas.dateLabel || "Today"} /> : null}
       {(project.messages ?? []).map((message, i) => (
         <div key={message.id}>
@@ -328,6 +331,9 @@ export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit, 
 
         <div className="dc-main">
           {canvas.chrome !== "none" ? <ChannelHeader canvas={canvas} mobile={mobile} edit={edit} /> : null}
+          {canvas.showUnreadBanner ? (
+            <UnreadBanner count={canvas.unreadCount} since={canvas.unreadSince} />
+          ) : null}
           {/* With no chrome the canvas sets its own inset — but only the
               vertical half of it goes on the scroller. The horizontal half is
               handed down as `--dc-edge` and added to each message's own
@@ -344,7 +350,14 @@ export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit, 
           >
             {rows}
           </div>
-          {canvas.chrome !== "none" ? <Composer canvas={canvas} mobile={mobile} /> : null}
+          {canvas.showFollow ? <FollowChannel /> : null}
+          {canvas.chrome !== "none" ? (
+            canvas.readOnly ? (
+              <NoAccess reason={canvas.readOnlyReason} />
+            ) : (
+              <Composer canvas={canvas} mobile={mobile} />
+            )
+          ) : null}
         </div>
 
         {canvas.chrome === "full" && !mobile ? <MemberList canvas={canvas} users={ctx.users} /> : null}
