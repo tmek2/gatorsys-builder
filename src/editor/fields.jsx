@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
+import { safeMedia } from "@/lib/urls";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -416,9 +417,14 @@ export function ImageField({ value, onChange, label, hint, onError, round = fals
         {/* The preview is masked the same way the slot is, so what you see
             here is the crop you are going to get. */}
         <span className="e-image-preview" data-round={round ? "true" : "false"}>
-          {value ? (
+          {/* Through the same guard the canvas uses. The preview exists to show
+              what the mockup will draw, so showing something the mockup would
+              refuse is a lie either way — and a `javascript:` or `data:text`
+              URL pasted into a field should not reach an element at all, even
+              one that would decline to run it. */}
+          {safeMedia(value) ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={value} alt="" />
+            <img src={safeMedia(value)} alt="" />
           ) : (
             <IconPhoto size={18} />
           )}

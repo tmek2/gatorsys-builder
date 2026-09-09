@@ -1095,6 +1095,21 @@ export function Builder({ user, canSignIn = true, shared = null }) {
             </div>
           </div>
 
+          {/* The documents behind the tool. They went out with the left
+              column, which is the one thing in that column that could not go:
+              they have to be on every screen. Bottom-left of the stage, out of
+              the way of the island and of everything anybody came here to
+              press, but always there. */}
+          <nav className="e-legal e-no-export" aria-label="About this tool">
+            <Link href="/terms">Terms</Link>
+            <span aria-hidden="true">·</span>
+            <Link href="/privacy">Privacy</Link>
+            <span aria-hidden="true">·</span>
+            <a href={SUPPORT_URL} target="_blank" rel="noreferrer">
+              Support
+            </a>
+          </nav>
+
           {/* The editor is a chat now: you write a message and press Enter,
               and the thing you just made is the thing in front of you. */}
           <Composer
