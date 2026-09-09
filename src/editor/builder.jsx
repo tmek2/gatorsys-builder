@@ -107,6 +107,11 @@ export function Builder({ user, canSignIn = true, shared = null }) {
   const [sheetOpen, setSheetOpen] = useState(null);
   const [tab, setTab] = useState("Content");
   const [selected, setSelected] = useState(null);
+  /* Where a press on the stage started, so a drag can be told from a click. */
+  const press = useRef(null);
+  /* Which message has been asked to open its words for editing, from outside
+     the message itself. */
+  const [editingId, setEditingId] = useState(null);
   const [zoom, setZoom] = useState(1);
   const [toast, setToast] = useState(null);
   const [loaded, setLoaded] = useState(false);
@@ -183,6 +188,18 @@ export function Builder({ user, canSignIn = true, shared = null }) {
       alive = false;
     };
   }, [notify, fail, shared]);
+
+  /* Open on the first message rather than on nothing.
+     Nothing selected means "I am writing a new one", which is the right thing
+     to mean after clicking away — but it is a strange thing to *open* on, and
+     it leaves the tray and the payload with nothing to describe. Once, when
+     the editor first has a document, and never again: re-running this would
+     undo every deliberate click away. */
+  useEffect(() => {
+    if (!loaded) return;
+    setSelected((current) => current ?? project.messages[0]?.id ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded]);
 
   /* Autosave. Debounced, because a keystroke is a state change and writing
      the whole project on every one of them is a transaction per character. */
@@ -321,11 +338,15 @@ export function Builder({ user, canSignIn = true, shared = null }) {
     });
   }, [project]);
 
+  /* Strictly what is selected, with no fallback to the first message.
+     There was one, from when a form on the right always had to be describing
+     something — and it meant nothing could ever be deselected: clicking empty
+     space cleared the selection and the first message silently took its place,
+     so the wash never went away and the next GIF landed on a message somebody
+     had not chosen. No selection now means "I am writing a new one", which is
+     what the composer beside it already meant. */
   const message = useMemo(
-    () =>
-      project.messages.find((m) => m.id === selected) ??
-      project.messages[0] ??
-      null,
+    () => project.messages.find((m) => m.id === selected) ?? null,
     [project.messages, selected],
   );
 
@@ -416,6 +437,19 @@ export function Builder({ user, canSignIn = true, shared = null }) {
           return { ...p, users };
         }),
       addMember: () => addUser(),
+      /* A member whose messages would be orphaned is reassigned rather than
+         taking the messages with them: losing a message because somebody
+         tidied up the member list would be a surprise. */
+      removeMember: (id) =>
+        commit((p) => {
+          if (p.users.length <= 1) return p;
+          const fallback = p.users.find((u) => u.id !== id)?.id;
+          return {
+            ...p,
+            users: p.users.filter((u) => u.id !== id),
+            messages: p.messages.map((m) => (m.user === id ? { ...m, user: fallback } : m)),
+          };
+        }),
       /* Roles are the server's, not a member's: recolouring one recolours
          everybody who has it. */
       role: (id, over) =>
@@ -434,6 +468,13 @@ export function Builder({ user, canSignIn = true, shared = null }) {
               : p.users,
           };
         }),
+      /* Deleting the role itself, which takes it off everybody. */
+      deleteRole: (id) =>
+        commit((p) => ({
+          ...p,
+          roles: (p.roles ?? []).filter((r) => r.id !== id),
+          users: p.users.map((u) => ({ ...u, roles: (u.roles ?? []).filter((r) => r !== id) })),
+        })),
       /* Taking a role off one member, which is not the same as deleting it. */
       dropRole: (userId, roleId) =>
         commit((p) => ({
@@ -451,6 +492,8 @@ export function Builder({ user, canSignIn = true, shared = null }) {
               : u,
           ),
         })),
+      /** The message whose words have been asked to open, if any. */
+      editing: editingId,
       /* The server's own settings, opened from the server's own icon. */
       server: () => {
         setAvatarFor(null);
@@ -470,7 +513,60 @@ export function Builder({ user, canSignIn = true, shared = null }) {
       },
       /* What the right-click menu offers, which depends on what was under the
          pointer: a message, or the canvas around it. */
-      menu: (id) => {
+      menu: (id, kind = "message") => {
+        /* The member list and the channel list are not the canvas. Offering
+           "Add a message" to somebody who right-clicked a member is the
+           browser's own context menu problem with our styling on it. */
+        if (kind === "member" || kind === "members") {
+          const who = project.users.find((u) => u.id === id);
+          if (!who) {
+            return [
+              { id: "add", label: "Add a member", icon: "add-friends", run: () => addUser() },
+              { id: "manage", label: "Manage members\u2026", icon: "members", run: () => { setFocusUser(null); setSheetOpen("members"); } },
+            ];
+          }
+          const mine = (who.roles ?? []).map((r) => project.roles?.find((x) => x.id === r)).filter(Boolean);
+          return [
+            { id: "edit", label: `Edit ${who.name}\u2026`, icon: "edit", run: () => edit.member(who.id) },
+            { id: "face", label: "Change their picture", icon: "person", run: () => edit.avatar(who.id) },
+            "-",
+            { id: "role", label: "Give them a new role", icon: "role-shield", run: () => edit.addRole(who.id) },
+            ...mine.map((role) => ({
+              id: `hoist:${role.id}`,
+              label: role.hoist
+                ? `Stop showing ${role.name} separately`
+                : `Show ${role.name} separately`,
+              icon: "members",
+              run: () => edit.role(role.id, { hoist: !role.hoist }),
+            })),
+            "-",
+            { id: "add", label: "Add a member", icon: "add-friends", run: () => addUser() },
+            {
+              id: "remove",
+              label: `Remove ${who.name}`,
+              icon: "person-remove",
+              danger: true,
+              disabled: project.users.length <= 1,
+              run: () => edit.removeMember(who.id),
+            },
+          ];
+        }
+
+        if (kind === "channels") {
+          const list = project.canvas.channels?.length
+            ? project.canvas.channels
+            : [project.canvas.channel?.name || "general"];
+          return [
+            {
+              id: "add",
+              label: "Add a channel",
+              icon: "plus",
+              run: () => edit.canvas({ channels: [...list, `channel-${list.length + 1}`] }),
+            },
+            { id: "server", label: "Server and channel\u2026", icon: "settings", run: () => setSheetOpen("appearance") },
+          ];
+        }
+
         if (!id) {
           return [
             { id: "add", label: "Add a message", icon: "plus", keys: "\u2318\u21B5", run: () => addMessage() },
@@ -484,9 +580,34 @@ export function Builder({ user, canSignIn = true, shared = null }) {
         }
         const at = project.messages.findIndex((m) => m.id === id);
         return [
-          { id: "edit", label: "Edit this message", icon: "edit", run: () => { setSelected(id); setTrayOpen(true); setPanelOpen(false); } },
+          /* "Edit this message" edits the message. It opened the tray of
+             everything a message can carry instead, which is a different
+             question — and the words are edited on the words now, so this
+             puts the caret in them. */
+          {
+            id: "edit",
+            label: "Edit this message",
+            icon: "edit",
+            run: () => {
+              setSelected(id);
+              setEditingId(id);
+              /* Raised for one frame. The field takes it from there and keeps
+                 its own state, so lowering it again cannot close the field
+                 somebody is typing into. */
+              window.requestAnimationFrame(() => setEditingId(null));
+            },
+          },
           { id: "embeds", label: "Add an embed", icon: "external", run: () => { setSelected(id); setTab("Embeds"); setTrayOpen(false); setPanelOpen(true); } },
           { id: "components", label: "Add components", icon: "apps", run: () => { setSelected(id); setTab("Components"); setTrayOpen(false); setPanelOpen(true); } },
+          /* Everything else a message can carry — reactions, a poll, a
+             profile card, the payload — is one board, and this is the way to
+             it from the message itself. */
+          {
+            id: "more",
+            label: "More options\u2026",
+            icon: "more",
+            run: () => { setSelected(id); setPanelOpen(false); setTrayOpen(true); },
+          },
           "-",
           { id: "up", label: "Move up", icon: "caret-up", disabled: at <= 0, run: () => edit.move(id, -1) },
           { id: "down", label: "Move down", icon: "caret-down", disabled: at === project.messages.length - 1, run: () => edit.move(id, 1) },
@@ -534,7 +655,10 @@ export function Builder({ user, canSignIn = true, shared = null }) {
           };
         }),
     }),
-    [commit],
+    /* `editingId` too: it is read out of the bundle by the row that has to
+       open, so a bundle memoised without it hands out a stale flag and the
+       menu item does nothing. */
+    [commit, editingId],
   );
 
   /* Whether the drawer over the canvas is showing. Picking a tool opens it on
@@ -653,13 +777,43 @@ export function Builder({ user, canSignIn = true, shared = null }) {
      the same panel before, which made four buttons that were one button in
      four costumes. Each adds its thing to the selected message and opens the
      tray on it, so you can see what landed and change it. */
+  /* An empty message to hang something on, for the controls that add rather
+     than type. Returns the one it made so a caller can carry on with it. */
+  const startMessage = useCallback(() => {
+    const author = sendAs ?? project.users[0].id;
+    const made = newMessage(author, {
+      content: "",
+      timestamp: nextStamp(project.messages) ?? "Today at 10:00",
+    });
+    commit((p) => ({ ...p, messages: [...p.messages, made] }));
+    setSelected(made.id);
+    return made;
+  }, [commit, project.messages, project.users, sendAs]);
+
   const addToMessage = useCallback(
     /* What the client's own buttons do, rather than four faces on one button.
        Each one adds the thing it is a picture of, with the file already in it
        — the picker handed it over — and nothing opens a panel to say so. The
        tray is for the things a message can carry that have no button. */
     (what, src = "") => {
-      if (!message) return;
+      /* Nothing selected means "I am writing a new one", the same as the text
+         field beside these buttons. Pressing GIF with no message picked used
+         to quietly attach it to whichever message was last touched. */
+      if (!message) {
+        const author = sendAs ?? project.users[0].id;
+        const made = newMessage(author, {
+          content: "",
+          timestamp: nextStamp(project.messages) ?? "Today at 10:00",
+        });
+        if (what === "attachment") made.attachments = [newAttachment({ kind: "image", src })];
+        else if (what === "gif") made.attachments = [newAttachment({ kind: "image", name: "tenor.gif", src })];
+        else if (what === "file") made.attachments = [newAttachment({ kind: "file", name: "document.pdf", src })];
+        else if (what === "sticker") made.sticker = { name: "Sticker", src };
+        else if (what === "gift") made.gift = newGift();
+        commit((p) => ({ ...p, messages: [...p.messages, made] }));
+        setSelected(made.id);
+        return;
+      }
       const attach = (over) =>
         patchMessage({ attachments: [...(message.attachments ?? []), newAttachment(over)] });
 
@@ -680,7 +834,7 @@ export function Builder({ user, canSignIn = true, shared = null }) {
         attach({ kind: "file", name: "document.pdf", src });
       }
     },
-    [message, patchMessage],
+    [message, patchMessage, commit, project.messages, project.users, sendAs],
   );
 
   const addMessage = useCallback(() => {
@@ -1194,6 +1348,39 @@ export function Builder({ user, canSignIn = true, shared = null }) {
             ref={scroller}
             data-grabbing={dragging ? "true" : "false"}
             {...canvasHandlers}
+            /* Pressing empty space puts the message down. A selection that
+               survives clicking away is a selection you have to remember, and
+               everything the island adds goes to the selected message — so a
+               stale one quietly attached the next GIF to the wrong row.
+               After the canvas's own handlers, not before: the spread would
+               otherwise replace this one and the press would never be
+               recorded. Both run — the canvas pans, and a press that turns out
+               to be a click puts the message down. */
+            onPointerDown={(event) => {
+              press.current = { x: event.clientX, y: event.clientY };
+              canvasHandlers.onPointerDown?.(event);
+            }}
+            onClick={(event) => {
+              const from = press.current;
+              press.current = null;
+              /* A click that travelled is a pan or a text selection, not a
+                 click, and neither should change what is selected. */
+              if (from && Math.hypot(event.clientX - from.x, event.clientY - from.y) > 4) return;
+              /* Only when the press actually landed on the ground: the
+                 scroller itself, the slack around the plate, or the plate.
+                 Anything inside the mockup is the mockup's business — and a
+                 rule written the other way round, as a list of things to
+                 ignore, was one selector away from swallowing the click that
+                 selects a message. */
+              const el = event.target;
+              if (!(el instanceof Element)) return;
+              const ground =
+                el === event.currentTarget ||
+                el.classList.contains("e-stage-pad") ||
+                el.classList.contains("e-frame");
+              if (!ground) return;
+              setSelected(null);
+            }}
           >
             <div className="e-stage-pad">
               <div
@@ -1271,6 +1458,10 @@ export function Builder({ user, canSignIn = true, shared = null }) {
             onAdd={addToMessage}
             emojis={project.emojis}
             onTool={(id) => {
+              /* Same rule as the buttons in the bar: with nothing selected
+                 these are about the message being written, not about
+                 whichever one was last touched. */
+              if (!message) startMessage();
               if (id === "Extras") {
                 setPanelOpen(false);
                 setTrayOpen((open) => !open);

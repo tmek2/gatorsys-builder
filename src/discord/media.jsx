@@ -24,6 +24,23 @@ import { InlineText } from "./inline";
  * three-column grid with the last row stretched. Approximating all of that
  * with one flexible grid is what makes a kit's gallery look like a contact
  * sheet instead of like Discord. */
+/* Text that becomes a field when there is an editor, and is plain text when
+ * there is not. Every card below draws three or four of these, and spelling
+ * the ternary out at each one buried the shape of the card under editing
+ * plumbing. */
+function Say({ on, value, set, label, placeholder, multiline = false }) {
+  if (!on) return value ?? null;
+  return (
+    <InlineText
+      value={value}
+      onChange={set}
+      label={label}
+      placeholder={placeholder}
+      multiline={multiline}
+    />
+  );
+}
+
 function gridClass(n) {
   if (n <= 1) return "dc-grid-1";
   if (n === 2) return "dc-grid-2";
@@ -39,12 +56,24 @@ export function GalleryGrid({ items = [], onSet, onDrop }) {
      lays out as a pair and paints one of them as a grey rectangle.
      Except while editing: a slot somebody just added, still empty, is exactly
      the thing they need to be able to press. */
-  const shown = onSet ? items : items.filter((item) => item.src);
+  const drawn = items.filter((item) => item.src);
+  const shown = onSet ? items : drawn;
   if (!shown.length) return null;
   return (
-    <div className={`dc-gallery ${gridClass(shown.length)}`}>
+    /* The grid is laid out for what will actually be drawn, not for what is
+       being edited: a slot still waiting for a file is a control, and a
+       control must not lay out — or appear at all — in the exported picture.
+       Four grey rectangles turned up in somebody's PNG exactly this way. */
+    <div
+      className={`dc-gallery ${gridClass(drawn.length || shown.length)}${drawn.length ? "" : " e-no-export"}`}
+    >
       {shown.map((item, i) => (
-        <figure className={`dc-gallery-cell${item.spoiler ? " dc-media-spoiler" : ""}`} key={item.id ?? i}>
+        <figure
+          className={`dc-gallery-cell${item.spoiler ? " dc-media-spoiler" : ""}${
+            item.src ? "" : " e-no-export"
+          }`}
+          key={item.id ?? i}
+        >
           {!item.src && onSet ? (
             <ImageDrop label="a picture" onChange={(src) => onSet(item.id, src)} />
           ) : /^data:video|\.(mp4|webm|mov)(\?|$)/i.test(item.src || "") ? (
@@ -112,7 +141,7 @@ const EXT_TINT = {
   csv: "#23a55a",
 };
 
-export function FileCard({ file }) {
+export function FileCard({ file, edit }) {
   const ext = (file.name || "").split(".").pop()?.toLowerCase() ?? "";
   return (
     <div className={`dc-file${file.spoiler ? " dc-media-spoiler" : ""}`}>
@@ -121,8 +150,12 @@ export function FileCard({ file }) {
         <span className="dc-file-ext">{ext.slice(0, 4)}</span>
       </span>
       <span className="dc-file-meta">
-        <span className="dc-file-name">{file.name || "file"}</span>
-        <span className="dc-file-size">{file.size || ""}</span>
+        <span className="dc-file-name">
+          <Say on={edit} value={file.name || "file"} set={(name) => edit({ name })} label="File name" />
+        </span>
+        <span className="dc-file-size">
+          <Say on={edit} value={file.size || ""} set={(size) => edit({ size })} label="File size" placeholder="1.2 MB" />
+        </span>
       </span>
       <Icon name="download" size={24} className="dc-file-down" title="Download" />
     </div>
@@ -163,14 +196,40 @@ function bars(seed, count = 46) {
   });
 }
 
-export function VoiceNote({ voice }) {
+export function VoiceNote({ voice, edit }) {
   const shape = bars((voice.duration || "0:07").split("").reduce((n, c) => n + c.charCodeAt(0), 0));
   const played = Math.min(1, Math.max(0, voice.progress ?? 0.35));
+  const playing = Boolean(voice.playing);
   return (
     <div className="dc-voice">
-      <span className="dc-voice-play" aria-hidden="true">
-        <Icon name="play" size={20} />
-      </span>
+      {/* Playing or paused, because a voice note in a screenshot is usually
+          mid-play — that is why somebody is screenshotting it. The pause mark
+          is drawn rather than taken from the atlas: the client's is two bars
+          with rounded ends and there is no such tile. */}
+      <button
+        type="button"
+        className="dc-voice-play"
+        disabled={!edit}
+        title={edit ? (playing ? "Show it stopped" : "Show it playing") : undefined}
+        aria-label={playing ? "Playing" : "Stopped"}
+        onClick={
+          edit
+            ? (event) => {
+                event.stopPropagation();
+                edit({ ...voice, playing: !playing });
+              }
+            : undefined
+        }
+      >
+        {playing ? (
+          <svg width="13" height="14" viewBox="0 0 13 14" aria-hidden="true">
+            <rect x="1" y="1" width="4" height="12" rx="1.6" fill="currentColor" />
+            <rect x="8" y="1" width="4" height="12" rx="1.6" fill="currentColor" />
+          </svg>
+        ) : (
+          <Icon name="play" size={13} />
+        )}
+      </button>
       <span className="dc-voice-wave" aria-hidden="true">
         {shape.map((h, i) => (
           <span
@@ -180,7 +239,17 @@ export function VoiceNote({ voice }) {
           />
         ))}
       </span>
-      <span className="dc-voice-time">{voice.duration || "0:07"}</span>
+      <span className="dc-voice-time">
+        {edit ? (
+          <InlineText
+            value={voice.duration || "0:07"}
+            onChange={(duration) => edit({ ...voice, duration })}
+            label="How long the voice note is"
+          />
+        ) : (
+          voice.duration || "0:07"
+        )}
+      </span>
     </div>
   );
 }
@@ -191,7 +260,7 @@ export function Sticker({ sticker, edit }) {
   if (!sticker) return null;
   if (!sticker.src && !edit) return null;
   return (
-    <div className="dc-sticker">
+    <div className={`dc-sticker${sticker.src ? "" : " e-no-export"}`}>
       {sticker.src ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={sticker.src} alt={sticker.name || ""} draggable={false} />
@@ -212,13 +281,15 @@ export function Sticker({ sticker, edit }) {
 
 /* ---------------------------------------------------------------- polls */
 
-export function Poll({ poll }) {
+export function Poll({ poll, edit }) {
   const total = poll.total ?? (poll.answers ?? []).reduce((n, a) => n + (a.votes || 0), 0);
   const top = Math.max(1, ...(poll.answers ?? []).map((a) => a.votes || 0));
 
   return (
     <div className="dc-poll">
-      <div className="dc-poll-question">{poll.question}</div>
+      <div className="dc-poll-question">
+        <Say on={edit} value={poll.question} set={(question) => edit({ question })} label="The question" placeholder="Ask something" />
+      </div>
       <div className="dc-poll-answers">
         {(poll.answers ?? []).map((answer) => {
           const share = total ? Math.round(((answer.votes || 0) / total) * 100) : 0;
@@ -228,7 +299,33 @@ export function Poll({ poll }) {
               <span className="dc-poll-fill" style={{ width: `${share}%` }} aria-hidden="true" />
               <span className="dc-poll-mark" aria-hidden="true" />
               {answer.emoji ? <Emoji text={answer.emoji} className="dc-poll-emoji" /> : null}
-              <span className="dc-poll-text">{answer.text}</span>
+              <span className="dc-poll-text">
+                <Say
+                  on={edit}
+                  value={answer.text}
+                  set={(text) =>
+                    edit({ answers: poll.answers.map((a) => (a.id === answer.id ? { ...a, text } : a)) })
+                  }
+                  label="Answer"
+                  placeholder="Answer"
+                />
+              </span>
+              {/* The share is arithmetic, so the editable number is the votes
+                  behind it — typing "40%" into a bar that is 12 of 30 votes
+                  would be a number that disagrees with itself. */}
+              {edit ? (
+                <span className="dc-poll-votes">
+                  <Say
+                    on
+                    value={String(answer.votes ?? 0)}
+                    set={(v) => {
+                      const votes = Math.max(0, parseInt(v.replace(/[^0-9]/g, ""), 10) || 0);
+                      edit({ answers: poll.answers.map((a) => (a.id === answer.id ? { ...a, votes } : a)) });
+                    }}
+                    label="Votes for this answer"
+                  />
+                </span>
+              ) : null}
               <span className="dc-poll-share">{share}%</span>
             </div>
           );
@@ -239,7 +336,13 @@ export function Poll({ poll }) {
           {total} {total === 1 ? "vote" : "votes"}
         </span>
         <span className="dc-embed-dot">•</span>
-        <span>{poll.finished ? "Final results" : poll.duration || "1 day left"}</span>
+        <span>
+          {poll.finished ? (
+            "Final results"
+          ) : (
+            <Say on={edit} value={poll.duration || "1 day left"} set={(duration) => edit({ duration })} label="How long is left" />
+          )}
+        </span>
         {poll.multiple ? (
           <>
             <span className="dc-embed-dot">•</span>
@@ -253,22 +356,39 @@ export function Poll({ poll }) {
 
 /* -------------------------------------------------------------- invites */
 
-export function Invite({ invite }) {
+export function Invite({ invite, edit }) {
   return (
     <div className="dc-invite">
       <div className="dc-invite-head">You have been invited to join a server</div>
       <div className="dc-invite-body">
         {invite.icon ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img className="dc-invite-icon" src={invite.icon} alt="" />
+          <span className="dc-invite-icon-slot">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img className="dc-invite-icon" src={invite.icon} alt="" />
+            {edit ? (
+              <ImageTools
+                value={invite.icon}
+                label="server icon"
+                align="start"
+                onChange={(icon) => edit({ icon })}
+                onRemove={() => edit({ icon: "" })}
+              />
+            ) : null}
+          </span>
         ) : (
           <span className="dc-invite-icon dc-invite-mono">{(invite.name || "S").slice(0, 1)}</span>
         )}
         <div className="dc-invite-meta">
-          <div className="dc-invite-name">{invite.name || "Server"}</div>
+          <div className="dc-invite-name">
+            <Say on={edit} value={invite.name || "Server"} set={(name) => edit({ name })} label="Server name" />
+          </div>
           <div className="dc-invite-counts">
-            <span className="dc-dot dc-dot-online" /> {invite.online || "0"} Online
-            <span className="dc-dot dc-dot-offline" /> {invite.members || "0"} Members
+            <span className="dc-dot dc-dot-online" />{" "}
+            <Say on={edit} value={String(invite.online ?? "0")} set={(online) => edit({ online })} label="How many online" />{" "}
+            Online
+            <span className="dc-dot dc-dot-offline" />{" "}
+            <Say on={edit} value={String(invite.members ?? "0")} set={(members) => edit({ members })} label="How many members" />{" "}
+            Members
           </div>
         </div>
         <button type="button" tabIndex={-1} className="dc-btn dc-btn-success dc-invite-join">
@@ -284,16 +404,26 @@ export function Invite({ invite }) {
 /* An unfurled link. Structurally an embed, but the client draws it with the
  * provider above the title and the thumbnail on the right at a larger size,
  * so it is its own card rather than an embed with fields left empty. */
-export function LinkPreview({ preview }) {
+export function LinkPreview({ preview, edit }) {
   return (
     <div className="dc-embed dc-link-preview" style={{ borderLeftColor: preview.color || "#1e1f22" }}>
       <div className="dc-embed-grid dc-embed-has-thumb">
         <div className="dc-embed-main">
-          {preview.provider ? <div className="dc-embed-provider">{preview.provider}</div> : null}
-          {preview.author ? <div className="dc-embed-author-name">{preview.author}</div> : null}
-          {preview.title ? (
+          {preview.provider || edit ? (
+            <div className="dc-embed-provider">
+              <Say on={edit} value={preview.provider} set={(provider) => edit({ provider })} label="Site name" placeholder="Site" />
+            </div>
+          ) : null}
+          {preview.author || edit ? (
+            <div className="dc-embed-author-name">
+              <Say on={edit} value={preview.author} set={(author) => edit({ author })} label="Author" placeholder="Author" />
+            </div>
+          ) : null}
+          {preview.title || edit ? (
             <div className="dc-embed-title">
-              {safeUrl(preview.url) ? (
+              {edit ? (
+                <Say on value={preview.title} set={(title) => edit({ title })} label="Title" placeholder="Title" />
+              ) : safeUrl(preview.url) ? (
                 <a className="dc-link" href={safeUrl(preview.url)} target="_blank" rel="noreferrer nofollow">
                   {preview.title}
                 </a>
@@ -302,9 +432,20 @@ export function LinkPreview({ preview }) {
               )}
             </div>
           ) : null}
-          {preview.description ? (
+          {preview.description || edit ? (
             <div className="dc-embed-description">
-              <Markdown text={preview.description} jumbo={false} />
+              {edit ? (
+                <Say
+                  on
+                  value={preview.description}
+                  set={(description) => edit({ description })}
+                  label="Description"
+                  placeholder="Description"
+                  multiline
+                />
+              ) : (
+                <Markdown text={preview.description} jumbo={false} />
+              )}
             </div>
           ) : null}
         </div>

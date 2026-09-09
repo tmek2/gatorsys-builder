@@ -30,6 +30,7 @@ export function InlineText({
   placeholder = "",
   label,
   autoFocus = false,
+  open = false,
 }) {
   /* A field that was just conjured by pressing "+" starts open. Adding a tag
      and then having to find and click the empty pill you just made is two
@@ -42,6 +43,14 @@ export function InlineText({
   useEffect(() => {
     if (!editing) setDraft(value ?? "");
   }, [value, editing]);
+
+  /* Somebody asked for this field from somewhere else — the right-click menu's
+     "Edit this message", say. One-way: the caller raises the flag for a frame
+     and lowers it, and the field keeps its own editing state from there, so
+     the two cannot fight over who closes it. */
+  useEffect(() => {
+    if (open) setEditing(true);
+  }, [open]);
 
   /* Grow to the text rather than scroll it, so a long message is edited in
      full instead of through a two-line window. */

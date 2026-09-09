@@ -16,7 +16,7 @@
  * rather than becoming a second toolbar.
  */
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   IconChevronDown,
   IconLayoutGrid,
@@ -30,6 +30,9 @@ import { Icon } from "@/discord/icon";
 import { Hint } from "./fields";
 import { EmojiInsert } from "./emoji-picker";
 import { fitWithin } from "@/lib/image";
+import { projectImages } from "@/lib/model";
+import { ALL_EMOJI } from "@/lib/emoji-data";
+import { twemojiUrl } from "@/discord/emoji";
 import { safeMedia } from "@/lib/urls";
 
 /* What the right rail opens. The labels are the words somebody would use for
@@ -42,14 +45,19 @@ export const TOOLS = [
 
 /* One of the client's own composer buttons, doing the thing it is a picture
  * of. Without `what` it is a plain button — the gift takes no file. With it,
- * pressing opens a small sheet offering the two ways anybody ever has a
- * picture: a file on this machine, or a link to one.
+ * pressing opens a picker.
  *
- * Not a file input on its own, because half the time the picture is already
- * on the internet and browsing for it is the wrong question.
+ * And a picker means a picker. The first version offered a file dialog and a
+ * URL field and nothing else, which is not what any of Discord's are: theirs
+ * open on a grid you choose from and keep the upload for the case the grid
+ * cannot answer. There is no Tenor here and no sticker store, so the grid is
+ * built from what this tool actually has — every picture already in the
+ * mockup, and the emoji library at sticker size, both searchable.
  */
-function MediaPick({ icon, label, hint, what, accept = "image/*", size = 20, onPick }) {
+function MediaPick({ icon, label, hint, what, kind, accept = "image/*", size = 20, project, onPick }) {
   const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState("mockup");
+  const [term, setTerm] = useState("");
   const [link, setLink] = useState("");
   const [busy, setBusy] = useState(false);
   const box = useRef(null);
@@ -74,6 +82,30 @@ function MediaPick({ icon, label, hint, what, accept = "image/*", size = 20, onP
     };
   }, [open]);
 
+  const mine = useMemo(
+    () => (project ? projectImages(project) : []),
+    [project],
+  );
+  const shownMine = useMemo(() => {
+    const q = term.trim().toLowerCase();
+    return q ? mine.filter((m) => (m.label || "").toLowerCase().includes(q)) : mine;
+  }, [mine, term]);
+  const shownEmoji = useMemo(() => {
+    const q = term.trim().toLowerCase();
+    /* `keywords` is a space-separated string, not a list — the picker's own
+       search reads it the same way. */
+    const all = q
+      ? ALL_EMOJI.filter((e) => e.keywords.includes(q) || e.char === term.trim())
+      : ALL_EMOJI;
+    return all.slice(0, 220);
+  }, [term]);
+
+  const choose = (src) => {
+    onPick(src);
+    setOpen(false);
+    setTerm("");
+  };
+
   if (!what) {
     return (
       <Hint label={hint}>
@@ -83,6 +115,14 @@ function MediaPick({ icon, label, hint, what, accept = "image/*", size = 20, onP
       </Hint>
     );
   }
+
+  /* Sticker art is what the emoji library is good for; a still emoji is not a
+     GIF and offering it as one would be a lie. */
+  const tabs = [
+    { id: "mockup", label: "In this mockup" },
+    ...(kind === "sticker" ? [{ id: "emoji", label: "Emoji" }] : []),
+    { id: "add", label: "Upload or link" },
+  ];
 
   return (
     <span className="c-pick" ref={box}>
@@ -101,52 +141,115 @@ function MediaPick({ icon, label, hint, what, accept = "image/*", size = 20, onP
 
       {open ? (
         <div className="c-pick-pop" role="dialog" aria-label={`Choose ${what}`}>
-          <input
-            ref={file}
-            type="file"
-            accept={accept}
-            hidden
-            onChange={async (event) => {
-              const chosen = event.target.files?.[0];
-              event.target.value = "";
-              if (!chosen) return;
-              setBusy(true);
-              try {
-                onPick(await fitWithin(chosen));
-                setOpen(false);
-              } finally {
-                setBusy(false);
-              }
-            }}
-          />
-          <button
-            type="button"
-            className="c-pick-file"
-            disabled={busy}
-            onClick={() => file.current?.click()}
-          >
-            <Icon name="upload" size={16} />
-            {busy ? "Reading\u2026" : `Choose ${what}`}
-          </button>
-          <span className="c-pick-or">or paste a link</span>
-          <input
-            className="c-pick-link"
-            value={link}
-            placeholder="https://\u2026"
-            aria-label={`Link to ${what}`}
-            onChange={(event) => setLink(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key !== "Enter") return;
-              event.preventDefault();
-              /* Refused rather than drawn: a javascript: or data:text/html
-                 source in a mockup is somebody else's script inside it. */
-              if (safeMedia(link)) {
-                onPick(link);
-                setLink("");
-                setOpen(false);
-              }
-            }}
-          />
+          <nav className="c-pick-tabs" role="tablist">
+            {tabs.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={tab === t.id}
+                data-on={tab === t.id ? "true" : "false"}
+                onClick={() => setTab(t.id)}
+              >
+                {t.label}
+              </button>
+            ))}
+          </nav>
+
+          {tab === "add" ? (
+            <>
+              <input
+                ref={file}
+                type="file"
+                accept={accept}
+                hidden
+                onChange={async (event) => {
+                  const chosen = event.target.files?.[0];
+                  event.target.value = "";
+                  if (!chosen) return;
+                  setBusy(true);
+                  try {
+                    choose(await fitWithin(chosen));
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="c-pick-file"
+                disabled={busy}
+                onClick={() => file.current?.click()}
+              >
+                <Icon name="upload" size={16} />
+                {busy ? "Reading…" : `Choose ${what}`}
+              </button>
+              <span className="c-pick-or">or paste a link</span>
+              <input
+                className="c-pick-link"
+                value={link}
+                placeholder="https://…"
+                aria-label={`Link to ${what}`}
+                onChange={(event) => setLink(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter") return;
+                  event.preventDefault();
+                  /* Refused rather than drawn: a javascript: or data:text/html
+                     source in a mockup is somebody else's script inside it. */
+                  if (safeMedia(link)) {
+                    choose(link);
+                    setLink("");
+                  }
+                }}
+              />
+            </>
+          ) : (
+            <>
+              <input
+                className="c-pick-search"
+                value={term}
+                placeholder="Search"
+                aria-label="Search"
+                onChange={(event) => setTerm(event.target.value)}
+              />
+              <div className="c-pick-grid">
+                {tab === "mockup"
+                  ? shownMine.map((item) => (
+                      <button
+                        key={item.src}
+                        type="button"
+                        className="c-pick-cell"
+                        title={item.label}
+                        aria-label={item.label}
+                        onClick={() => choose(item.src)}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={item.src} alt="" loading="lazy" />
+                      </button>
+                    ))
+                  : shownEmoji.map((e) => (
+                      <button
+                        key={e.char}
+                        type="button"
+                        className="c-pick-cell"
+                        title={e.keywords.split(" ")[0]}
+                        aria-label={e.keywords.split(" ")[0]}
+                        onClick={() => choose(twemojiUrl(e.char))}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={twemojiUrl(e.char)} alt="" loading="lazy" />
+                      </button>
+                    ))}
+              </div>
+              {(tab === "mockup" ? shownMine : shownEmoji).length ? null : (
+                <p className="c-pick-empty">
+                  {tab === "mockup"
+                    ? "Nothing here yet. Anything you add to this mockup shows up in this list."
+                    : "No emoji match that."}
+                </p>
+              )}
+            </>
+          )}
         </div>
       ) : null}
     </span>
@@ -234,6 +337,7 @@ function AuthorPill({ project, author, onPick, onEdit, onAdd }) {
         <button
           type="button"
           className="c-author-btn"
+          data-open={open ? "true" : "false"}
           aria-haspopup="menu"
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
@@ -243,7 +347,10 @@ function AuthorPill({ project, author, onPick, onEdit, onAdd }) {
           <span className="c-author-name" style={author?.color ? { color: author.color } : undefined}>
             {author?.name ?? "Nobody"}
           </span>
-          <IconChevronDown size={13} stroke={2.2} />
+          {/* Turns over when the list is open. A control that offers a menu
+              and looks identical whether the menu is up or down is a control
+              that makes you check. */}
+          <IconChevronDown className="c-author-caret" size={13} stroke={2.2} />
         </button>
       </Hint>
     </div>
@@ -319,6 +426,8 @@ export function Composer({
           hint="Attach a picture or a file to this message"
           size={22}
           what="a picture"
+          kind="image"
+          project={project}
           onPick={(src) => onAdd("attachment", src)}
         />
 
@@ -359,6 +468,8 @@ export function Composer({
             hint="Put a GIF in this message"
             accept="image/gif,image/webp,image/*,video/mp4,video/webm"
             what="a GIF"
+            kind="gif"
+            project={project}
             onPick={(src) => onAdd("gif", src)}
           />
           <MediaPick
@@ -366,6 +477,8 @@ export function Composer({
             label="Sticker"
             hint="Put a sticker in this message"
             what="a sticker"
+            kind="sticker"
+            project={project}
             onPick={(src) => onAdd("sticker", src)}
           />
           <EmojiInsert onPick={(emoji) => setDraft((d) => d + emoji)} custom={emojis} />

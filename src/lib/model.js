@@ -357,6 +357,11 @@ export const newCanvas = (over = {}) => ({
   followText: "Follow this channel to post updates into your own server.",
   readOnly: false,
   readOnlyReason: "You do not have permission to send messages in this channel.",
+  /* The phone's own status bar. Every screenshot taken on a phone has one,
+     and 9:41 is the time Apple puts in theirs. */
+  showStatusBar: true,
+  phoneTime: "9:41",
+  phoneBattery: 78,
   showTyping: false,
   typingNames: "Someone",
   ...over,
@@ -364,15 +369,34 @@ export const newCanvas = (over = {}) => ({
 
 /* ---------------------------------------------------------------- blank */
 
+/* The empty document's ids are fixed, not generated.
+ *
+ * This page is server-rendered and then hydrated, and `blankProject()` runs on
+ * both sides — so a random id meant the server wrote one set of ids into the
+ * HTML and the browser built another. React kept the server's attributes and
+ * the client's state, and from then on the two disagreed: the `data-id` on a
+ * message was not the id of any message in the project. Clicking a message
+ * looked up an id that did not exist.
+ *
+ * That went unnoticed for a long time because the editor used to fall back to
+ * "the first message" whenever the lookup failed, which is exactly the answer
+ * that hid it.
+ *
+ * Ids only have to be unique *within* a document, and a blank document is one
+ * document, so fixed ones are correct. Everything created after this — every
+ * message, member and embed somebody adds — is minted properly, and copying a
+ * document re-ids it.
+ */
 export function blankProject() {
   const bot = newUser({
+    id: "usr_blank_bot",
     name: "Gator",
     color: "#f7a8c4",
     avatar: avatarUrl(0),
     bot: true,
     verified: true,
   });
-  const person = newUser({ name: "Member", color: "#5fd08a", avatar: avatarUrl(12) });
+  const person = newUser({ id: "usr_blank_member", name: "Member", color: "#5fd08a", avatar: avatarUrl(12) });
 
   return {
     version: PROJECT_VERSION,
@@ -384,6 +408,7 @@ export function blankProject() {
     canvas: newCanvas(),
     messages: [
       newMessage(bot.id, {
+        id: "msg_blank_welcome",
         content: "Welcome to the server.",
         timestamp: "Today at 10:00",
       }),
@@ -420,4 +445,43 @@ export function reid(node) {
     return copy;
   }
   return node;
+}
+
+/* Every picture already in a mockup, once, in the order somebody would look
+ * for them.
+ *
+ * The pickers offer this first. "Which picture?" is most often answered with
+ * one that is already here — the same avatar, the same screenshot, the sticker
+ * from two messages up — and making somebody find that file on disk again is
+ * the reason a picker without a gallery is worse than no picker.
+ */
+export function projectImages(project) {
+  const out = [];
+  const seen = new Set();
+  const take = (src, label) => {
+    if (!src || seen.has(src)) return;
+    seen.add(src);
+    out.push({ src, label });
+  };
+
+  for (const emoji of project.emojis ?? []) take(emoji.src, `:${emoji.name}:`);
+  for (const message of project.messages ?? []) {
+    for (const a of message.attachments ?? []) take(a.src, a.name || "attachment");
+    take(message.sticker?.src, message.sticker?.name || "sticker");
+    take(message.profile?.banner, "banner");
+    take(message.invite?.icon, message.invite?.name || "invite");
+    take(message.linkPreview?.image, "link image");
+    take(message.linkPreview?.thumbnail, "link thumbnail");
+    for (const embed of message.embeds ?? []) {
+      take(embed.image, "embed image");
+      take(embed.thumbnail, "embed thumbnail");
+      take(embed.authorIcon, "author icon");
+      take(embed.footerIcon, "footer icon");
+    }
+  }
+  take(project.canvas?.server?.icon, "server icon");
+  take(project.canvas?.customBackground, "background");
+  for (const user of project.users ?? []) take(user.avatar, user.name);
+
+  return out;
 }

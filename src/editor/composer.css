@@ -576,3 +576,101 @@
   color: var(--g-ink);
   background: var(--g-surface-sunken, rgba(255, 255, 255, 0.08));
 }
+
+/* The chevron on the author pill. Half a turn, on the same curve the popover
+   itself uses, so the two read as one movement rather than a menu appearing
+   next to an arrow that did not notice. */
+.c-author-caret {
+  transition: transform 260ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+.c-author-btn[data-open="true"] .c-author-caret {
+  transform: rotate(180deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .c-author-caret {
+    transition: none;
+  }
+}
+
+/* The picker's own furniture: tabs, a search field, and the grid they choose
+   from. Sized so the popover is a picker rather than a dialog — it opens over
+   the mockup and must not cover it. */
+.c-pick-pop {
+  width: 320px;
+}
+.c-pick-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--g-surface-sunken, rgba(255, 255, 255, 0.05));
+}
+.c-pick-tabs button {
+  flex: 1;
+  height: 26px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--g-ink-dim);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 130ms ease, color 130ms ease;
+}
+.c-pick-tabs button[data-on="true"] {
+  background: var(--g-surface);
+  color: var(--g-ink);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+.c-pick-search {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--g-line);
+  border-radius: 9px;
+  background: var(--g-surface-sunken, transparent);
+  color: var(--g-ink);
+  font: inherit;
+  font-size: 13px;
+  outline: none;
+}
+.c-pick-search:focus {
+  border-color: var(--g-accent, #f7a8c4);
+}
+.c-pick-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(46px, 1fr));
+  gap: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.c-pick-cell {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  padding: 4px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: none;
+  cursor: pointer;
+}
+.c-pick-cell:hover {
+  border-color: var(--g-line);
+  background: var(--g-surface-sunken, rgba(255, 255, 255, 0.06));
+}
+.c-pick-cell img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.c-pick-empty {
+  margin: 0;
+  padding: 10px 4px;
+  color: var(--g-ink-dim);
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: center;
+}

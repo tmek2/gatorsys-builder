@@ -164,7 +164,7 @@ function InteractionLine({ interaction, users }) {
   );
 }
 
-function ForwardCard({ forwarded }) {
+function ForwardCard({ forwarded, edit }) {
   if (!forwarded) return null;
   return (
     <div className="dc-forward">
@@ -173,21 +173,68 @@ function ForwardCard({ forwarded }) {
         Forwarded
       </div>
       <div className="dc-forward-body">
-        <Markdown text={forwarded.content || ""} jumbo={false} />
+        {edit ? (
+          <InlineText
+            value={forwarded.content || ""}
+            onChange={(content) => edit({ ...forwarded, content })}
+            label="What was forwarded"
+            placeholder="The forwarded text"
+            multiline
+            render={
+              forwarded.content
+                ? () => <Markdown text={forwarded.content} jumbo={false} />
+                : undefined
+            }
+          />
+        ) : (
+          <Markdown text={forwarded.content || ""} jumbo={false} />
+        )}
       </div>
-      {forwarded.from ? <div className="dc-forward-from">{forwarded.from}</div> : null}
+      {forwarded.from || edit ? (
+        <div className="dc-forward-from">
+          {edit ? (
+            <InlineText
+              value={forwarded.from}
+              onChange={(from) => edit({ ...forwarded, from })}
+              label="Where it came from"
+              placeholder="#channel"
+            />
+          ) : (
+            forwarded.from
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
 
-function ThreadTag({ thread }) {
+function ThreadTag({ thread, edit }) {
   if (!thread) return null;
   return (
     <div className="dc-thread-tag">
       <Icon name="threads" size={16} />
-      <span className="dc-thread-name">{thread.name || "Thread"}</span>
+      <span className="dc-thread-name">
+        {edit ? (
+          <InlineText
+            value={thread.name || "Thread"}
+            onChange={(name) => edit({ ...thread, name })}
+            label="Thread name"
+          />
+        ) : (
+          thread.name || "Thread"
+        )}
+      </span>
       <span className="dc-thread-count">
-        {thread.count ?? 0} {thread.count === 1 ? "message" : "messages"}
+        {edit ? (
+          <InlineText
+            value={String(thread.count ?? 0)}
+            onChange={(v) => edit({ ...thread, count: Math.max(0, parseInt(v.replace(/[^0-9]/g, ""), 10) || 0) })}
+            label="How many messages in it"
+          />
+        ) : (
+          thread.count ?? 0
+        )}{" "}
+        {thread.count === 1 ? "message" : "messages"}
       </span>
       <span className="dc-thread-go">See thread ›</span>
     </div>
@@ -396,6 +443,7 @@ function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, 
                  showing the rendered form in the field would be a lie about
                  what you are typing. */
               <InlineText
+                open={edit.editing === message.id}
                 value={message.content}
                 onChange={(next) => edit.content(message.id, next)}
                 multiline
@@ -414,7 +462,12 @@ function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, 
           </div>
         ) : null}
 
-        {message.forwarded ? <ForwardCard forwarded={message.forwarded} /> : null}
+        {message.forwarded ? (
+          <ForwardCard
+            forwarded={message.forwarded}
+            edit={edit ? (forwarded) => edit.patch(message.id, { forwarded }, "forwarded") : undefined}
+          />
+        ) : null}
 
         {message.embeds?.map((embed) => (
           <Embed
@@ -433,8 +486,18 @@ function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, 
           />
         ))}
 
-        {message.linkPreview ? <LinkPreview preview={message.linkPreview} /> : null}
-        {message.invite ? <Invite invite={message.invite} /> : null}
+        {message.linkPreview ? (
+          <LinkPreview
+            preview={message.linkPreview}
+            edit={edit ? (over) => edit.patch(message.id, { linkPreview: { ...message.linkPreview, ...over } }, "preview") : undefined}
+          />
+        ) : null}
+        {message.invite ? (
+          <Invite
+            invite={message.invite}
+            edit={edit ? (over) => edit.patch(message.id, { invite: { ...message.invite, ...over } }, "invite") : undefined}
+          />
+        ) : null}
 
         {message.attachments?.length ? (
           <Attachments
@@ -442,7 +505,12 @@ function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, 
             edit={edit ? (attachments) => edit.patch(message.id, { attachments }) : undefined}
           />
         ) : null}
-        {message.voice ? <VoiceNote voice={message.voice} /> : null}
+        {message.voice ? (
+          <VoiceNote
+            voice={message.voice}
+            edit={edit ? (voice) => edit.patch(message.id, { voice }, "voice") : undefined}
+          />
+        ) : null}
         {message.sticker ? (
           <Sticker
             sticker={message.sticker}
@@ -459,7 +527,12 @@ function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, 
 
         {message.components?.length ? <Blocks blocks={message.components} /> : null}
 
-        {message.poll ? <Poll poll={message.poll} /> : null}
+        {message.poll ? (
+          <Poll
+            poll={message.poll}
+            edit={edit ? (over) => edit.patch(message.id, { poll: { ...message.poll, ...over } }, "poll") : undefined}
+          />
+        ) : null}
 
         {message.profile ? (
           <ProfileCard
@@ -476,7 +549,12 @@ function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, 
         ) : null}
         {message.reactions?.length ? <Reactions reactions={message.reactions} /> : null}
 
-        {message.thread ? <ThreadTag thread={message.thread} /> : null}
+        {message.thread ? (
+          <ThreadTag
+            thread={message.thread}
+            edit={edit ? (thread) => edit.patch(message.id, { thread }, "thread") : undefined}
+          />
+        ) : null}
 
         {message.ephemeral ? (
           <div className="dc-only-you">

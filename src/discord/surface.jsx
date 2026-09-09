@@ -73,21 +73,72 @@ function ServerRail({ canvas, edit }) {
   );
 }
 
-function ChannelList({ canvas, edit }) {
-  const channels = canvas.channels?.length ? canvas.channels : [canvas.channel?.name || "general"];
+/* What a channel can be, and the glyph the client draws for each. Pressing
+   the glyph cycles it, which is one gesture for a choice of five — a select
+   on every row would be five dropdowns in a sidebar. */
+const CHANNEL_KINDS = [
+  { id: "text", icon: "channel-text", label: "Text" },
+  { id: "voice", icon: "channel-voice", label: "Voice" },
+  { id: "announcement", icon: "channel-announcement", label: "Announcement" },
+  { id: "forum", icon: "channel-forum", label: "Forum" },
+  { id: "rules", icon: "channel-rules", label: "Rules" },
+];
+
+/* Channels are stored as strings, which is all a mockup needed until it
+   needed categories and types. Both shapes are accepted on the way in and only
+   the object shape is written back, so an older project keeps working. */
+function asChannel(entry) {
+  if (typeof entry === "string") return { name: entry, kind: "text" };
+  return { name: entry?.name ?? "channel", kind: entry?.kind ?? "text", category: entry?.category };
+}
+
+function ChannelList({ canvas, edit, onMenu }) {
+  const raw = canvas.channels?.length ? canvas.channels : [canvas.channel?.name || "general"];
+  const channels = raw.map(asChannel);
   const current = canvas.channel?.name || "general";
+  const box = useRef(null);
+
+  const write = (next, over) =>
+    edit.canvas({ channels: next.map((c) => ({ name: c.name, kind: c.kind, ...(c.category ? { category: c.category } : {}) })), ...over });
+
+  const order = useDragOrder({
+    onMove: (from, to) => {
+      const next = [...channels];
+      const [held] = next.splice(from, 1);
+      next.splice(to, 0, held);
+      write(next);
+    },
+    scrollers: [],
+  });
 
   /* Renaming the channel the mockup is *in* has to rename it everywhere: the
      header, this row and the composer's placeholder are one name written
      three times. Renaming any other row is only that row. */
   const rename = (i, name) => {
-    const next = channels.map((c, j) => (j === i ? name : c));
-    edit.canvas(channels[i] === current ? { channels: next, channel: { ...canvas.channel, name } } : { channels: next },
-      `channels:${i}`);
+    const next = channels.map((c, j) => (j === i ? { ...c, name } : c));
+    write(next, channels[i].name === current ? { channel: { ...canvas.channel, name } } : undefined);
   };
 
+  /* One heading per run of channels that share a category, so a category is
+     created by typing one on a channel rather than by managing a second list.
+     The first run takes the channel settings' own category name. */
+  const rows = [];
+  let heading = null;
+  channels.forEach((channel, i) => {
+    const label = channel.category ?? (i === 0 ? canvas.channel?.category || "TEXT CHANNELS" : heading);
+    if (label !== heading) {
+      heading = label;
+      rows.push({ kind: "head", label, at: i });
+    }
+    rows.push({ kind: "channel", channel, at: i });
+  });
+
   return (
-    <aside className="dc-sidebar" aria-label="Channels">
+    <aside
+      className="dc-sidebar"
+      aria-label="Channels"
+      onContextMenu={onMenu ? (event) => onMenu(event, null, "channels") : undefined}
+    >
       <header className="dc-sidebar-head">
         {edit ? (
           <InlineText
@@ -101,75 +152,189 @@ function ChannelList({ canvas, edit }) {
         )}
         <Icon name="caret-down" size={18} aria-hidden="true" />
       </header>
-      <div className="dc-sidebar-body">
-        <div className="dc-sidebar-category">
-          {edit ? (
-            <InlineText
-              value={canvas.channel?.category || "TEXT CHANNELS"}
-              onChange={(category) =>
-                edit.canvas({ channel: { ...canvas.channel, category } }, "channel:category")
-              }
-              label="Category"
-              placeholder="TEXT CHANNELS"
-            />
+      <div className="dc-sidebar-body" ref={box}>
+        {rows.map((row) =>
+          row.kind === "head" ? (
+            <div className="dc-sidebar-category" key={`h${row.at}`}>
+              {edit ? (
+                <InlineText
+                  value={row.label}
+                  onChange={(category) => {
+                    /* The heading names every channel under it, down to the
+                       next heading, so renaming one moves the whole run. */
+                    let touching = false;
+                    const next = channels.map((c, j) => {
+                      if (j === row.at) touching = true;
+                      else if (touching && c.category !== undefined && j !== row.at) touching = false;
+                      return touching && j >= row.at ? { ...c, category } : c;
+                    });
+                    write(next, row.at === 0 ? { channel: { ...canvas.channel, category } } : undefined);
+                  }}
+                  label="Category"
+                  placeholder="CATEGORY"
+                />
+              ) : (
+                row.label
+              )}
+            </div>
           ) : (
-            canvas.channel?.category || "TEXT CHANNELS"
-          )}
-        </div>
-        {channels.map((name, i) => (
-          <div
-            className={`dc-sidebar-channel${name === current ? " dc-sidebar-on" : ""}`}
-            key={`${name}-${i}`}
-          >
-            <Icon name="channel-text" size={20} className="dc-hash" aria-hidden="true" />
-            {edit ? (
-              <InlineText value={name} onChange={(v) => rename(i, v)} label="Channel name" />
-            ) : (
-              name
-            )}
-            {edit ? (
-              <span className="dc-sidebar-tools e-no-export">
-                {name === current ? null : (
-                  <button
-                    type="button"
-                    title={`Draw this mockup in #${name}`}
-                    aria-label={`Draw this mockup in ${name}`}
-                    onClick={() => edit.canvas({ channel: { ...canvas.channel, name } }, "channel:name")}
-                  >
-                    <Icon name="check" size={13} />
-                  </button>
-                )}
+            <div
+              className={`dc-sidebar-channel${row.channel.name === current ? " dc-sidebar-on" : ""}`}
+              key={`c${row.at}`}
+              data-row
+              data-held={order.drag?.from === row.at ? "true" : undefined}
+              onContextMenu={onMenu ? (event) => onMenu(event, null, "channels") : undefined}
+            >
+              {edit ? (
                 <button
                   type="button"
-                  title="Remove this channel"
-                  aria-label={`Remove ${name}`}
-                  disabled={channels.length <= 1}
+                  className="dc-hash dc-hash-live e-no-export"
+                  title={`${CHANNEL_KINDS.find((k) => k.id === (row.channel.kind || "text"))?.label} channel — press to change`}
+                  aria-label="Change the channel type"
                   onClick={() => {
-                    const next = channels.filter((_, j) => j !== i);
-                    edit.canvas(
-                      name === current
-                        ? { channels: next, channel: { ...canvas.channel, name: next[0] } }
-                        : { channels: next },
-                    );
+                    const at = CHANNEL_KINDS.findIndex((k) => k.id === (row.channel.kind || "text"));
+                    const kind = CHANNEL_KINDS[(at + 1) % CHANNEL_KINDS.length].id;
+                    write(channels.map((c, j) => (j === row.at ? { ...c, kind } : c)));
                   }}
                 >
-                  <Icon name="close" size={13} />
+                  <Icon
+                    name={CHANNEL_KINDS.find((k) => k.id === (row.channel.kind || "text"))?.icon ?? "channel-text"}
+                    size={20}
+                  />
                 </button>
-              </span>
-            ) : null}
-          </div>
-        ))}
+              ) : (
+                <Icon
+                  name={CHANNEL_KINDS.find((k) => k.id === (row.channel.kind || "text"))?.icon ?? "channel-text"}
+                  size={20}
+                  className="dc-hash"
+                  aria-hidden="true"
+                />
+              )}
+              {edit ? (
+                <InlineText value={row.channel.name} onChange={(v) => rename(row.at, v)} label="Channel name" />
+              ) : (
+                row.channel.name
+              )}
+              {edit ? (
+                <span className="dc-sidebar-tools e-no-export">
+                  <span
+                    className="dc-sidebar-grip"
+                    role="button"
+                    tabIndex={-1}
+                    aria-label="Drag to reorder"
+                    title="Drag to reorder"
+                    {...order.handlers(row.at, box)}
+                  >
+                    <Icon name="more-vertical" size={13} />
+                  </span>
+                  {row.channel.name === current ? null : (
+                    <button
+                      type="button"
+                      title={`Draw this mockup in #${row.channel.name}`}
+                      aria-label={`Draw this mockup in ${row.channel.name}`}
+                      onClick={() => edit.canvas({ channel: { ...canvas.channel, name: row.channel.name } }, "channel:name")}
+                    >
+                      <Icon name="check" size={13} />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    title="Remove this channel"
+                    aria-label={`Remove ${row.channel.name}`}
+                    disabled={channels.length <= 1}
+                    onClick={() => {
+                      const next = channels.filter((_, j) => j !== row.at);
+                      write(
+                        next,
+                        row.channel.name === current
+                          ? { channel: { ...canvas.channel, name: next[0].name } }
+                          : undefined,
+                      );
+                    }}
+                  >
+                    <Icon name="close" size={13} />
+                  </button>
+                </span>
+              ) : null}
+            </div>
+          ),
+        )}
         {edit ? (
-          <button
-            type="button"
-            className="dc-sidebar-add e-no-export"
-            onClick={() => edit.canvas({ channels: [...channels, `channel-${channels.length + 1}`] })}
-          >
-            <Icon name="plus" size={16} /> Add a channel
-          </button>
+          <div className="dc-sidebar-adds e-no-export">
+            <button
+              type="button"
+              className="dc-sidebar-add"
+              onClick={() => write([...channels, { name: `channel-${channels.length + 1}`, kind: "text" }])}
+            >
+              <Icon name="plus" size={16} /> Add a channel
+            </button>
+            <button
+              type="button"
+              className="dc-sidebar-add"
+              onClick={() =>
+                write([
+                  ...channels,
+                  { name: `channel-${channels.length + 1}`, kind: "text", category: "NEW CATEGORY" },
+                ])
+              }
+            >
+              <Icon name="list-add" size={16} /> Add a category
+            </button>
+          </div>
         ) : null}
       </div>
     </aside>
+  );
+}
+
+/* The phone's own status bar.
+ *
+ * Every screenshot taken on a phone has one, and a mockup without it is the
+ * first thing that gives it away — the header starts at the very top of the
+ * glass, which never happens on a real device. Drawn rather than faked with an
+ * image so the clock is editable and the whole thing takes the theme.
+ */
+function PhoneStatus({ canvas, edit }) {
+  const time = canvas.phoneTime || "9:41";
+  return (
+    <div className="dc-m-status">
+      <span className="dc-m-status-time">
+        {edit ? (
+          <InlineText
+            value={time}
+            onChange={(v) => edit.canvas({ phoneTime: v })}
+            label="The time on the phone"
+          />
+        ) : (
+          time
+        )}
+      </span>
+      <span className="dc-m-status-right" aria-hidden="true">
+        {/* Signal, then wi-fi, then the battery: the order iOS uses. */}
+        <svg width="18" height="12" viewBox="0 0 18 12">
+          {[0, 1, 2, 3].map((i) => (
+            <rect
+              key={i}
+              x={i * 4.5}
+              y={9 - i * 3}
+              width="3"
+              height={3 + i * 3}
+              rx="1"
+              fill="currentColor"
+            />
+          ))}
+        </svg>
+        <svg width="16" height="12" viewBox="0 0 16 12">
+          <path
+            d="M8 10.6 5.8 8.3a3.2 3.2 0 0 1 4.4 0zM3.6 6.1a6.4 6.4 0 0 1 8.8 0l1.4-1.5a8.5 8.5 0 0 0-11.6 0z"
+            fill="currentColor"
+          />
+        </svg>
+        <span className="dc-m-battery">
+          <span className="dc-m-battery-fill" style={{ width: `${canvas.phoneBattery ?? 78}%` }} />
+        </span>
+      </span>
+    </div>
   );
 }
 
@@ -230,7 +395,7 @@ function ChannelHeader({ canvas, mobile, edit }) {
   );
 }
 
-function MemberList({ canvas, users, roles = [], edit, scrollers }) {
+function MemberList({ canvas, users, roles = [], edit, scrollers, onMenu }) {
   /* Discord splits the list by hoisted role first and only then by presence.
      A role nobody has, or one nobody has asked to display separately, is not
      a heading — it would be an empty section in a picture of a busy server. */
@@ -240,13 +405,13 @@ function MemberList({ canvas, users, roles = [], edit, scrollers }) {
   for (const role of hoisted) {
     const list = users.filter((u) => !taken.has(u.id) && u.roles?.includes(role.id));
     list.forEach((u) => taken.add(u.id));
-    if (list.length) sections.push([role.name.toUpperCase(), list]);
+    if (list.length) sections.push([role.name.toUpperCase(), list, role]);
   }
   const rest = users.filter((u) => !taken.has(u.id));
   const online = rest.filter((u) => u.status !== "offline");
   const offline = rest.filter((u) => u.status === "offline");
-  if (online.length) sections.push(["ONLINE", online]);
-  if (offline.length) sections.push(["OFFLINE", offline]);
+  if (online.length) sections.push(["ONLINE", online, null]);
+  if (offline.length) sections.push(["OFFLINE", offline, null]);
 
   /* One flat index across every section, so dragging carries a member from
      under one heading to another and the drop lands where the eye says. */
@@ -260,11 +425,29 @@ function MemberList({ canvas, users, roles = [], edit, scrollers }) {
   let seen = -1;
 
   return (
-    <aside className="dc-members" aria-label="Members" ref={box}>
-      {sections.map(([label, list]) => (
+    <aside
+      className="dc-members"
+      aria-label="Members"
+      ref={box}
+      onContextMenu={onMenu ? (event) => onMenu(event, null, "members") : undefined}
+    >
+      {sections.map(([label, list, role]) => (
         <Fragment key={label}>
           <div className="dc-members-label">
-            {label} — {list.length}
+            {/* A heading that is a role is the role: typing here renames it
+                everywhere it is drawn. ONLINE and OFFLINE are not roles and
+                are not typed into. */}
+            {role && edit ? (
+              <InlineText
+                value={role.name}
+                onChange={(name) => edit.role(role.id, { name })}
+                label="Role name"
+                className="dc-members-role"
+              />
+            ) : (
+              label
+            )}{" "}
+            — {list.length}
           </div>
           {list.map((u) => {
             seen += 1;
@@ -277,8 +460,10 @@ function MemberList({ canvas, users, roles = [], edit, scrollers }) {
                 className="dc-member"
                 key={u.id}
                 data-row
+                data-offline={u.status === "offline" ? "true" : undefined}
                 data-held={held ? "true" : undefined}
                 data-landing={landing ? "true" : undefined}
+                onContextMenu={onMenu ? (event) => onMenu(event, u.id, "member") : undefined}
                 {...(edit ? order.handlers(i, box) : {})}
               >
                 <span className="dc-member-face">
@@ -440,12 +625,16 @@ export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit, 
      Reload and View Page Source. */
   const [menu, setMenu] = useState(null);
   const openMenu = useCallback(
-    (event, id) => {
+    /* `kind` says what was under the pointer, because the answer to "what can
+       I do here" is different in the member list than it is on a message —
+       and right-clicking a member and being offered "Add a message" is the
+       browser's own menu problem all over again, just with our styling on it. */
+    (event, id, kind = "message") => {
       if (!edit) return;
       event.preventDefault();
       event.stopPropagation();
-      if (id) onSelect?.(id);
-      setMenu({ at: { x: event.clientX, y: event.clientY }, id });
+      if (id && kind === "message") onSelect?.(id);
+      setMenu({ at: { x: event.clientX, y: event.clientY }, id, kind });
     },
     [edit, onSelect],
   );
@@ -557,9 +746,12 @@ export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit, 
         onContextMenu={edit ? (event) => openMenu(event, null) : undefined}
       >
         {canvas.chrome === "full" && !mobile ? <ServerRail canvas={canvas} edit={edit} /> : null}
-        {canvas.chrome === "full" && !mobile ? <ChannelList canvas={canvas} edit={edit} /> : null}
+        {canvas.chrome === "full" && !mobile ? <ChannelList canvas={canvas} edit={edit} onMenu={edit ? openMenu : undefined} /> : null}
 
         <div className="dc-main">
+          {mobile && canvas.chrome !== "none" && canvas.showStatusBar !== false ? (
+            <PhoneStatus canvas={canvas} edit={edit} />
+          ) : null}
           {canvas.chrome !== "none" ? <ChannelHeader canvas={canvas} mobile={mobile} edit={edit} /> : null}
           {canvas.showUnreadBanner ? (
             <UnreadBanner count={canvas.unreadCount} since={canvas.unreadSince} edit={edit} />
@@ -573,6 +765,22 @@ export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit, 
           <div
             ref={conversation}
             className="dc-scroll"
+            /* The room above the conversation is empty space in the mockup,
+               and pressing empty space puts the selection down — same rule as
+               the stage around it. Only when the press lands on the column
+               itself or on the stream's own padding, never on a row. */
+            onClick={
+              onSelect
+                ? (event) => {
+                    if (
+                      event.target === event.currentTarget ||
+                      event.target.classList?.contains("dc-stream")
+                    ) {
+                      onSelect(null);
+                    }
+                  }
+                : undefined
+            }
             style={
               canvas.chrome === "none"
                 ? { paddingBlock: canvas.padding, "--dc-edge": `${canvas.padding ?? 0}px` }
@@ -599,13 +807,13 @@ export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit, 
           ) : null}
         </div>
 
-        {canvas.chrome === "full" && !mobile ? <MemberList canvas={canvas} users={ctx.users} roles={project.roles ?? []} edit={edit} scrollers={views} /> : null}
+        {canvas.chrome === "full" && !mobile ? <MemberList canvas={canvas} users={ctx.users} roles={project.roles ?? []} edit={edit} scrollers={views} onMenu={edit ? openMenu : undefined} /> : null}
       </div>
       {menu ? (
         <ContextMenu
           at={menu.at}
           onClose={() => setMenu(null)}
-          items={edit.menu(menu.id)}
+          items={edit.menu(menu.id, menu.kind)}
         />
       ) : null}
     </RenderContext.Provider>

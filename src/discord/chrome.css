@@ -164,6 +164,43 @@
   cursor: default;
 }
 
+/* The channel's own glyph is a control: pressing it walks through text,
+   voice, announcement, forum and rules. A select per row would be five
+   dropdowns in a sidebar that is meant to read as a sidebar. */
+.dc-hash-live {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.dc-hash-live:hover {
+  background: var(--background-mod-strong);
+  color: var(--text-strong);
+}
+.dc-sidebar-grip {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 20px;
+  color: var(--text-muted);
+  cursor: grab;
+  touch-action: none;
+}
+.dc-sidebar-grip:active {
+  cursor: grabbing;
+}
+.dc-sidebar-channel[data-held="true"] {
+  opacity: 0.5;
+}
+.dc-sidebar-adds {
+  display: flex;
+  flex-direction: column;
+}
+
 /* One more row at the end of the list, quiet until you look for it. */
 .dc-sidebar-add {
   display: flex;
@@ -256,6 +293,12 @@
   height: 42px;
   padding: 0 8px;
   border-radius: 4px;
+}
+/* Offline is dimmer. The client draws an offline member at about a third
+   opacity, avatar and all — without it the two groups read identically and
+   the heading is the only thing saying which is which. */
+.dc-member[data-offline="true"] {
+  opacity: 0.32;
 }
 .dc-member-face {
   position: relative;
@@ -359,13 +402,16 @@
   flex-direction: column;
 }
 
+/* The client's own header inset, not a narrowed desktop one. The back
+   chevron sat against the glass and the three tools against the other edge —
+   on a real phone there is a thumb's worth of room on both sides. */
 .dc-m-head {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   height: 52px;
   flex: none;
-  padding: 0 12px;
+  padding: 0 16px;
   background: var(--background-base-low);
   color: var(--text-strong);
 }
@@ -384,8 +430,10 @@
 }
 .dc-m-head-tools {
   display: flex;
-  gap: 18px;
+  align-items: center;
+  gap: 20px;
   flex: none;
+  margin-left: 4px;
   color: var(--text-default);
 }
 
@@ -658,4 +706,58 @@
   background: var(--background-mod-subtle);
   color: var(--text-muted);
   font-size: 14px;
+}
+
+/* ------------------------------------------------- the phone's status bar */
+
+.dc-m-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: none;
+  height: 44px;
+  padding: 0 26px 0 30px;
+  background: var(--background-base-low);
+  color: var(--text-strong);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.dc-m-status-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dc-m-battery {
+  position: relative;
+  display: inline-block;
+  width: 25px;
+  height: 12px;
+  padding: 2px;
+  border: 1px solid color-mix(in srgb, currentColor 45%, transparent);
+  border-radius: 4px;
+}
+/* The nub on the end, which is the half that makes it read as a battery. */
+.dc-m-battery::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -3px;
+  width: 2px;
+  height: 4px;
+  border-radius: 0 1px 1px 0;
+  background: color-mix(in srgb, currentColor 45%, transparent);
+  transform: translateY(-50%);
+}
+.dc-m-battery-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+/* A member-list heading that is a role: it takes the heading's own case and
+   weight, so renaming it in place does not turn it into body text. */
+.dc-members-role {
+  text-transform: uppercase;
 }

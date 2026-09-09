@@ -56,6 +56,12 @@
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  /* A finger inside the mockup scrolls the mockup. Without this the stage
+     around it — which is also a scroll container, and is panned rather than
+     scrolled — took the gesture, and a phone mockup taller than its frame
+     could not be read past the first screen. */
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
   /* Scrolling inside the mockup is scrolling inside the mockup. Without this
      the stage takes over the moment the conversation hits its end, so reading
      to the bottom of a long mockup threw the whole canvas across the editor. */
@@ -1107,15 +1113,27 @@
   gap: 10px;
 }
 .dc-audio-play,
+/* The client's is a 32px disc with a small mark in the middle. It was a 20px
+   glyph in a 28px circle, which put the triangle's points on the edge — that
+   is what read as "sharp". */
 .dc-voice-play {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   flex: none;
+  padding: 0;
+  border: 0;
   border-radius: 50%;
   background: var(--control-primary-background-default);
   color: #fff;
+  cursor: pointer;
+}
+.dc-voice-play:disabled {
+  cursor: default;
+}
+.dc-voice-play:not(:disabled):hover {
+  filter: brightness(1.12);
 }
 .dc-audio-track {
   position: relative;
@@ -1407,6 +1425,26 @@
 
 /* ------------------------------------------------------------- ephemeral */
 
+/* An ephemeral message. The client washes the whole row in the blurple it
+   uses for "only you can see this" — the note underneath says it in words and
+   the wash says it at a glance, and the wash was missing. */
+.dc-ephemeral {
+  background: color-mix(in srgb, var(--dc-blurple, #5865f2) 8%, transparent);
+}
+.dc-ephemeral::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: 2px;
+  background: var(--dc-blurple, #5865f2);
+}
+/* Selection still wins: which message is being edited has to stay legible
+   over whatever the message itself is tinted. */
+.dc-ephemeral.dc-selected::after {
+  background: var(--g-accent, #f7a8c4);
+}
+
 .dc-only-you {
   display: flex;
   align-items: center;
@@ -1593,6 +1631,18 @@
   left: 0;
   width: 2px;
   background: var(--g-accent, #f7a8c4);
+}
+
+/* A scrollbar is the browser's, not Discord's. The conversation scrolls
+   inside the window now, so the rasteriser was drawing the track down the
+   right-hand side of every exported PNG of a long mockup. */
+[data-exporting="true"] .dc-scroll,
+[data-exporting="true"] .dc-pop-scroll {
+  scrollbar-width: none;
+}
+[data-exporting="true"] .dc-scroll::-webkit-scrollbar,
+[data-exporting="true"] .dc-pop-scroll::-webkit-scrollbar {
+  display: none;
 }
 
 /* None of this belongs in an exported PNG: it says which message the editor
@@ -2217,7 +2267,7 @@
 
 .dc-rowtools-grip {
   display: grid;
-  width: 22px;
+  width: 26px;
   height: 24px;
   place-items: center;
   border-radius: 6px;
@@ -2707,23 +2757,175 @@
   user-select: none !important;
 }
 
-/* The handle. It was a 15px glyph in the corner of a toolbar that only
-   appeared on the selected row, which is a lot of aiming for "move this one up
-   a bit". Same place, twice the target, and it says what it is. */
-.dc-rowtools-grip {
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 24px;
-  border-radius: 6px;
-  color: var(--text-muted);
-  cursor: grab;
-  touch-action: none;
-}
-.dc-rowtools-grip:hover {
-  background: var(--background-mod-strong);
-  color: var(--text-strong);
-}
+/* The handle was a 15px glyph, which is a lot of aiming for "move this one up
+   a bit". Twice the target, and it says what it is. */
 .dc-rowtools-grip:active {
   cursor: grabbing;
+}
+
+/* --------------------------------------- panels opened from the mockup */
+
+/* Everything that opens from something drawn on the canvas: the role
+   settings, the badge library, the sticker and GIF pickers. On the body,
+   above the sheets, because it is always the innermost thing open. */
+.dc-pop {
+  position: fixed;
+  z-index: 210;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: min(60vh, 460px);
+  padding: 10px;
+  border: 1px solid var(--g-line, rgba(255, 255, 255, 0.1));
+  border-radius: 14px;
+  background: var(--mac-pane-bg, #1e1f22);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+  color: var(--g-ink, #f2f3f5);
+  font-family: var(--font-nunito), system-ui, sans-serif;
+  font-size: 13px;
+  animation: dc-pop-in 200ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+@keyframes dc-pop-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dc-pop { animation: none; }
+}
+.dc-pop-head {
+  color: var(--g-ink-dim, #949ba4);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.dc-pop-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.dc-pop-swatches {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+.dc-pop-swatch {
+  height: 24px;
+  border: 2px solid transparent;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.dc-pop-swatch[data-on="true"] {
+  border-color: #fff;
+}
+.dc-pop-switch {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+  line-height: 1.35;
+}
+.dc-pop-switch input {
+  margin-top: 2px;
+  accent-color: var(--g-accent, #f7a8c4);
+}
+.dc-pop-danger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 30px;
+  border: 0;
+  border-radius: 9px;
+  background: color-mix(in srgb, #f23f43 18%, transparent);
+  color: #f77;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.dc-pop-danger:hover {
+  background: color-mix(in srgb, #f23f43 30%, transparent);
+}
+.dc-pop-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(38px, 1fr));
+  gap: 4px;
+}
+.dc-pop-cell {
+  display: grid;
+  place-items: center;
+  height: 38px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: none;
+  cursor: pointer;
+}
+.dc-pop-cell:hover {
+  background: rgba(255, 255, 255, 0.07);
+}
+.dc-pop-cell[data-on="true"] {
+  border-color: var(--g-accent, #f7a8c4);
+  background: color-mix(in srgb, var(--g-accent, #f7a8c4) 16%, transparent);
+}
+.dc-pop-cell img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.dc-pop-empty {
+  padding: 14px 4px;
+  color: var(--g-ink-dim, #949ba4);
+  text-align: center;
+}
+
+/* Badges on the card, once they are things you can add and take away. */
+.dc-profile-badge {
+  position: relative;
+  display: inline-flex;
+}
+.dc-profile-badge-drop {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  display: none;
+  place-items: center;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--background-base-lowest, #111214);
+  color: var(--text-default);
+  cursor: pointer;
+}
+.dc-profile-badge:hover .dc-profile-badge-drop {
+  display: grid;
+}
+.dc-profile-badge-add {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 1px dashed var(--border-subtle);
+  border-radius: 6px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.dc-profile-badge-add:hover {
+  border-color: var(--text-muted);
+  color: var(--text-strong);
+}
+
+/* The dot on a role chip is a button now. */
+.dc-profile-role-dot-live {
+  padding: 0;
+  border: 0;
+  cursor: pointer;
+}
+.dc-profile-role-dot-live:hover {
+  box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 25%, transparent);
 }
