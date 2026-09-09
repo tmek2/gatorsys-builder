@@ -348,6 +348,196 @@ function ChannelList({ canvas, edit, scrollers, onMenu }) {
  * glass, which never happens on a real device. Drawn rather than faked with an
  * image so the clock is editable and the whole thing takes the theme.
  */
+/* The phone's own furniture: the status bar at the top and the home bar at
+ * the bottom.
+ *
+ * Both are the device, not the app, and both are what makes a picture read as
+ * a phone rather than as a narrow window. The status bar was here already and
+ * was missing the one thing a modern iPhone is recognised by — the island —
+ * and the bottom had nothing at all, which is why the message box and the
+ * read-only bar were sitting in the screen's rounded corners with nowhere to
+ * go. iOS keeps 34pt clear down there and every app lays out above it.
+ */
+/* iOS's own status colours. Green while it charges, yellow in Low Power Mode,
+   red when it is nearly out — the three a person recognises without being
+   told which is which. */
+const BATTERY_STATES = [
+  { id: "normal", label: "Normal", color: "" },
+  { id: "charging", label: "Charging", color: "#30d158" },
+  { id: "saver", label: "Low Power Mode", color: "#ffd60a" },
+  { id: "low", label: "Low battery", color: "#ff453a" },
+];
+
+/* Every one of the three is the control for itself.
+ *
+ * The bars, the wi-fi and the battery were three fixed pictures: a mockup of a
+ * phone with no signal, or one about to die, could not be drawn at all. They
+ * are pressed now — each press steps to the next state and wraps — and the
+ * battery takes a drag along its length for the level, so "about a third" is
+ * one gesture rather than a number typed into a form. A press that travels is
+ * the drag; one that does not is the step, decided at release, which is the
+ * only way one small target can carry both. */
+function PhoneSignal({ canvas, edit }) {
+  const bars = canvas.phoneSignal ?? 4;
+  const label = bars ? `${bars} of 4 bars` : "No service";
+  const glyph = (
+    <svg width="18" height="12" viewBox="0 0 18 12" aria-hidden="true">
+      {[0, 1, 2, 3].map((i) => (
+        <rect
+          key={i}
+          x={i * 4.5}
+          y={9 - i * 3}
+          width="3"
+          height={3 + i * 3}
+          rx="1"
+          fill="currentColor"
+          opacity={i < bars ? 1 : 0.3}
+        />
+      ))}
+    </svg>
+  );
+  if (!edit) return glyph;
+  return (
+    <button
+      type="button"
+      className="dc-m-radio"
+      title={`${label} — press to change`}
+      aria-label="Change the signal strength"
+      onClick={(event) => {
+        event.stopPropagation();
+        edit.canvas({ phoneSignal: bars === 0 ? 4 : bars - 1 });
+      }}
+    >
+      {glyph}
+    </button>
+  );
+}
+
+function PhoneWifi({ canvas, edit }) {
+  const level = canvas.phoneWifi ?? 3;
+  const label = ["Not connected", "Weak", "Medium", "Strong"][level] ?? "Strong";
+  /* Three parts, the way iOS draws it: the dot, then two arcs over it. A
+     weaker signal dims the outer ones rather than removing them, so the mark
+     keeps its shape and only its weight changes. Nothing connected gets the
+     line through it. */
+  const glyph = (
+    <svg width="17" height="12" viewBox="0 0 17 12" aria-hidden="true">
+      <path
+        d="M8.5 11.2 6.1 8.7a3.4 3.4 0 0 1 4.8 0z"
+        fill="currentColor"
+        opacity={level >= 1 ? 1 : 0.3}
+      />
+      <path
+        d="M3.9 6.4a6.6 6.6 0 0 1 9.2 0l1.4-1.5a8.7 8.7 0 0 0-12 0z"
+        fill="currentColor"
+        opacity={level >= 2 ? 1 : 0.3}
+        transform="translate(0,1.6)"
+      />
+      <path
+        d="M1.5 3.5a10 10 0 0 1 14 0L16.9 2a12 12 0 0 0-16.8 0z"
+        fill="currentColor"
+        opacity={level >= 3 ? 1 : 0.3}
+      />
+      {level === 0 ? (
+        <path d="M2 11 15 1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      ) : null}
+    </svg>
+  );
+  if (!edit) return glyph;
+  return (
+    <button
+      type="button"
+      className="dc-m-radio"
+      title={`Wi-Fi: ${label} — press to change`}
+      aria-label="Change the wi-fi strength"
+      onClick={(event) => {
+        event.stopPropagation();
+        edit.canvas({ phoneWifi: level === 0 ? 3 : level - 1 });
+      }}
+    >
+      {glyph}
+    </button>
+  );
+}
+
+function PhoneBattery({ canvas, edit }) {
+  const level = Math.max(0, Math.min(100, canvas.phoneBattery ?? 78));
+  const state = BATTERY_STATES.find((b) => b.id === (canvas.phoneBatteryState || "normal")) ?? BATTERY_STATES[0];
+  const shell = useRef(null);
+  const press = useRef(null);
+
+  /* The fill's track, not the whole shell: dragging to the far left should
+     empty it, and the shell is 2px of border wider than the thing being set. */
+  const levelAt = (clientX) => {
+    const r = shell.current?.getBoundingClientRect();
+    if (!r) return level;
+    const track = r.width - 6;
+    return Math.max(0, Math.min(100, Math.round(((clientX - r.left - 3) / track) * 100)));
+  };
+
+  const body = (
+    <span
+      className="dc-m-battery"
+      ref={shell}
+      data-state={state.id}
+      style={state.color ? { "--dc-battery": state.color } : undefined}
+    >
+      <span className="dc-m-battery-fill" style={{ width: `${level}%` }} />
+      {state.id === "charging" ? (
+        <svg className="dc-m-battery-bolt" viewBox="0 0 10 14" aria-hidden="true">
+          <path d="M6.2 0 1 7.6h3L3.8 14 9 6.4H6z" fill="currentColor" />
+        </svg>
+      ) : null}
+    </span>
+  );
+  if (!edit) return body;
+
+  return (
+    <span
+      className="dc-m-radio dc-m-battery-live"
+      role="button"
+      tabIndex={0}
+      title={`${level}% · ${state.label} — press to change, drag to set the level`}
+      aria-label="Battery"
+      onPointerDown={(event) => {
+        if (event.button !== 0) return;
+        event.stopPropagation();
+        press.current = { x: event.clientX, moved: false };
+        event.currentTarget.setPointerCapture?.(event.pointerId);
+      }}
+      onPointerMove={(event) => {
+        const p = press.current;
+        if (!p) return;
+        /* Until it has travelled this is a press, and a press is the state
+           step. Five pixels is the same hysteresis the row drags use. */
+        if (!p.moved && Math.abs(event.clientX - p.x) < 5) return;
+        p.moved = true;
+        edit.canvas({ phoneBattery: levelAt(event.clientX) }, "phone:battery");
+      }}
+      onPointerUp={(event) => {
+        const p = press.current;
+        press.current = null;
+        event.currentTarget.releasePointerCapture?.(event.pointerId);
+        if (p && !p.moved) {
+          const at = BATTERY_STATES.findIndex((b) => b.id === state.id);
+          edit.canvas({ phoneBatteryState: BATTERY_STATES[(at + 1) % BATTERY_STATES.length].id });
+        }
+      }}
+      onKeyDown={(event) => {
+        if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+          event.preventDefault();
+          edit.canvas(
+            { phoneBattery: Math.max(0, Math.min(100, level + (event.key === "ArrowRight" ? 5 : -5))) },
+            "phone:battery",
+          );
+        }
+      }}
+    >
+      {body}
+    </span>
+  );
+}
+
 function PhoneStatus({ canvas, edit }) {
   const time = canvas.phoneTime || "9:41";
   return (
@@ -363,31 +553,27 @@ function PhoneStatus({ canvas, edit }) {
           time
         )}
       </span>
-      <span className="dc-m-status-right" aria-hidden="true">
+      {/* Drawn, not cut out. A screenshot from one of these phones carries the
+          island as a black pill, because the system masks it into the capture
+          — so a mockup that leaves it out looks like a phone from 2021. */}
+      <span className="dc-m-island" aria-hidden="true" />
+      <span className="dc-m-status-right">
         {/* Signal, then wi-fi, then the battery: the order iOS uses. */}
-        <svg width="18" height="12" viewBox="0 0 18 12">
-          {[0, 1, 2, 3].map((i) => (
-            <rect
-              key={i}
-              x={i * 4.5}
-              y={9 - i * 3}
-              width="3"
-              height={3 + i * 3}
-              rx="1"
-              fill="currentColor"
-            />
-          ))}
-        </svg>
-        <svg width="16" height="12" viewBox="0 0 16 12">
-          <path
-            d="M8 10.6 5.8 8.3a3.2 3.2 0 0 1 4.4 0zM3.6 6.1a6.4 6.4 0 0 1 8.8 0l1.4-1.5a8.5 8.5 0 0 0-11.6 0z"
-            fill="currentColor"
-          />
-        </svg>
-        <span className="dc-m-battery">
-          <span className="dc-m-battery-fill" style={{ width: `${canvas.phoneBattery ?? 78}%` }} />
-        </span>
+        <PhoneSignal canvas={canvas} edit={edit} />
+        <PhoneWifi canvas={canvas} edit={edit} />
+        <PhoneBattery canvas={canvas} edit={edit} />
       </span>
+    </div>
+  );
+}
+
+/* The home bar. 34pt of clear space with a 139x5 indicator sitting 8pt off
+   the bottom — iOS's own numbers, and the reason nothing in an iPhone app
+   ever sits in the bottom two corners. */
+function PhoneHome() {
+  return (
+    <div className="dc-m-home" aria-hidden="true">
+      <span className="dc-m-home-bar" />
     </div>
   );
 }
@@ -420,7 +606,7 @@ function ChannelHeader({ canvas, mobile, edit }) {
   if (mobile) {
     return (
       <header className="dc-m-head">
-        <Icon name="caret-left" size={22} className="dc-m-back" />
+        <Icon name="caret-left" size={20} className="dc-m-back" />
         {hash}
         <span className="dc-m-head-name">
           {edit ? (
@@ -436,9 +622,9 @@ function ChannelHeader({ canvas, mobile, edit }) {
         <span className="dc-m-head-tools">
           {/* A text channel's header has threads, pins and search. The call
               button belongs to a DM and a voice channel, not to this. */}
-          <Icon name="threads" size={20} />
-          <Icon name="pins" size={20} />
-          <Icon name="members" size={20} />
+          <Icon name="threads" size={21} />
+          <Icon name="pins" size={21} />
+          <Icon name="members" size={21} />
         </span>
       </header>
     );
@@ -917,6 +1103,9 @@ export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit, 
               <Composer canvas={canvas} mobile={mobile} />
             )
           ) : null}
+          {/* Last, so everything else lays out above it — which is the whole
+              point of it. */}
+          {mobile && canvas.chrome !== "none" && canvas.showStatusBar !== false ? <PhoneHome /> : null}
         </div>
 
         {canvas.chrome === "full" && !mobile ? <MemberList canvas={canvas} users={ctx.users} roles={project.roles ?? []} edit={edit} scrollers={stage} onMenu={edit ? openMenu : undefined} /> : null}

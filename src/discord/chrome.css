@@ -433,7 +433,7 @@
 .dc-m-head-tools {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 18px;
   flex: none;
   margin-left: 4px;
   color: var(--text-default);
@@ -444,13 +444,21 @@
   align-items: center;
   gap: 10px;
   flex: none;
-  min-height: 42px;
-  margin: 8px 12px 12px;
+  min-height: 44px;
+  margin: 8px 12px 6px;
   padding: 0 14px;
   border-radius: 999px;
   background: var(--input-background);
   color: var(--text-muted);
   font-size: 15px;
+}
+/* The other two things that can hold the bottom slot sit where the message box
+   sits — clear of the home bar, and inset from the sides by the same amount.
+   They were carrying the desktop's margins, so a read-only channel put its
+   notice into the screen's bottom corners. */
+.dc-mobile .dc-no-access,
+.dc-mobile .dc-follow {
+  margin: 8px 12px 6px;
 }
 
 /* The phone's message grid.
@@ -461,12 +469,12 @@
  * the right. Reactions and components inherit that narrower measure. */
 .dc-mobile .dc-message {
   grid-template-columns: 52px minmax(0, 1fr);
-  padding: 2px 12px 2px 12px;
+  padding: 2px 16px;
   margin-top: 16px;
 }
 .dc-mobile .dc-system {
   grid-template-columns: 52px minmax(0, 1fr);
-  padding: 2px 12px;
+  padding: 2px 16px;
 }
 .dc-mobile .dc-avatar-slot,
 .dc-mobile .dc-avatar {
@@ -717,32 +725,122 @@
 
 /* ------------------------------------------------- the phone's status bar */
 
+/* iOS's own numbers on a 393pt screen: a 54pt bar, the time centred in the
+   space left of the island, the radios in the space right of it. It was a
+   44pt flex row with the time hard against one edge, which put both halves
+   where the island is and read as an older phone. */
 .dc-m-status {
-  display: flex;
+  position: relative;
+  display: grid;
+  /* Three regions, the island the middle one. Sized in the middle and shared
+     either side, so a mockup drawn at a width other than the phone's keeps
+     the island the size it really is and moves the rest around it. */
+  grid-template-columns: 1fr 125px 1fr;
   align-items: center;
-  justify-content: space-between;
   flex: none;
-  height: 44px;
-  padding: 0 26px 0 30px;
+  height: 54px;
+  /* 5 at the top and none at the bottom puts the island's top edge at 11 and
+     the time on its centre line, which is where iOS has them. Nothing at the
+     sides: the island is centred on the *screen*, and uneven side padding
+     pushed it off centre by the difference. The time and the radios carry
+     their own insets instead. */
+  padding: 5px 0 0;
   background: var(--background-base-low);
   color: var(--text-strong);
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: 0.01em;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+/* Centred in the space left of the island, which is where iOS puts it —
+   not hard against the left edge. */
+.dc-m-status-time {
+  justify-self: center;
+}
+/* 125 x 37, 11pt down from the top edge — the island, at its real size. It is
+   black on every theme because it is a hole in the screen, not a surface the
+   app is drawing. */
+.dc-m-island {
+  width: 125px;
+  height: 37px;
+  border-radius: 999px;
+  background: #000;
 }
 .dc-m-status-right {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 6px;
+  padding-right: 22px;
 }
+
+/* The home bar. The 34pt below every iPhone app, and the reason a message box
+   never sits in the screen's bottom corners. */
+.dc-m-home {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  flex: none;
+  height: 34px;
+  padding-bottom: 8px;
+}
+.dc-m-home-bar {
+  width: 139px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--text-strong);
+  /* Present, not shouting: iOS draws it a good way under full white. */
+  opacity: 0.68;
+}
+/* Each of the three is its own control. No chrome at rest — they are the
+   picture, and the picture is what gets exported — so what says they can be
+   pressed is the cursor and the way they answer the press. */
+.dc-m-radio {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: transform 100ms ease-out;
+}
+.dc-m-radio:active {
+  transform: scale(0.92);
+}
+.dc-m-radio:focus-visible {
+  outline: 2px solid var(--g-accent, #f7a8c4);
+  outline-offset: 2px;
+}
+.dc-m-battery-live {
+  /* Along its length is the level; a press is the state. */
+  cursor: ew-resize;
+  touch-action: none;
+}
+
 .dc-m-battery {
   position: relative;
   display: inline-block;
   width: 25px;
   height: 12px;
   padding: 2px;
-  border: 1px solid color-mix(in srgb, currentColor 45%, transparent);
+  /* The shell keeps the bar's own colour whatever the battery is doing — iOS
+     tints the fill, never the outline. */
+  border: 1px solid color-mix(in srgb, var(--text-strong) 45%, transparent);
   border-radius: 4px;
+  color: var(--dc-battery, currentColor);
+}
+/* The bolt sits over the fill in the bar's own foreground colour, which is
+   what iOS does — and it has to be, because at ten per cent it is over the
+   empty part of the shell rather than over the green. */
+.dc-m-battery-bolt {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 7px;
+  height: 10px;
+  color: var(--text-strong);
+  transform: translate(-50%, -50%);
 }
 /* The nub on the end, which is the half that makes it read as a battery. */
 .dc-m-battery::after {
@@ -753,14 +851,16 @@
   width: 2px;
   height: 4px;
   border-radius: 0 1px 1px 0;
-  background: color-mix(in srgb, currentColor 45%, transparent);
+  background: color-mix(in srgb, var(--text-strong) 45%, transparent);
   transform: translateY(-50%);
 }
 .dc-m-battery-fill {
   display: block;
   height: 100%;
+  min-width: 0;
   border-radius: 2px;
   background: currentColor;
+  transition: width 90ms linear;
 }
 
 /* A member-list heading that is a role: it takes the heading's own case and

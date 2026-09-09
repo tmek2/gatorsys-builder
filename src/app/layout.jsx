@@ -39,7 +39,7 @@ const inter = Inter({
 
 /* Bumped whenever an icon file changes. See the note on `icons` below: this
    is the only thing that gets a browser to let go of the one it cached. */
-const ICON_VERSION = "4";
+const ICON_VERSION = "5";
 
 export const metadata = {
   metadataBase: new URL("https://mockups.gatorsys.xyz"),
@@ -71,7 +71,13 @@ export const metadata = {
 
      The .ico now actually holds the five sizes it claims. It held one 16px
      image and said it had five, so every ask for a 32 — which is what a tab
-     wants on a scaled Windows display — got a 16 stretched to fit. */
+     wants on a scaled Windows display — got a 16 stretched to fit.
+
+     And the mark is drawn whole. Its tile used to be worked out by hand from
+     a raster, and the arithmetic was wrong in a way nothing checked: the box
+     cut the tail and the feet off at all four edges. It is measured from the
+     path now, and sized so the mark stands at about three quarters of the
+     tile's height, which is where a tall mark sits on Apple's icon grid. */
   icons: {
     icon: [
       { url: `/favicon.svg?v=${ICON_VERSION}`, type: "image/svg+xml" },

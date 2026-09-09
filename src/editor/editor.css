@@ -699,9 +699,13 @@
 /* The device. A thin bezel and a corner radius taken from the phone itself —
    a 38px radius on a 393px screen is visibly not an iPhone, and the 10px band
    read as a picture frame rather than as a body. */
+/* The screen's own radius is 55pt on the phone this is imitating, and the
+   body's is that plus the bezel. At 54 the corners were tighter than the
+   content laid out inside them, which is how a message box ended up with its
+   corner cut off. */
 .e-frame-phone {
-  border: 8px solid #0c0c0e;
-  border-radius: 54px !important;
+  border: 9px solid #0c0c0e;
+  border-radius: 64px !important;
   box-shadow: var(--mac-lift-high), 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 /* A canvas with one short message in it would be a sliver; these give it
