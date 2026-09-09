@@ -160,7 +160,7 @@ export function Slider({ value, onChange, min, max, step = 1, suffix = "" }) {
    on the way down and back out again. */
 const NONE = "\u0000none";
 
-export function Pick({ value, onChange, options, placeholder = "Choose" }) {
+export function Pick({ value, onChange, options, placeholder = "Choose", label, title }) {
   /* Only when the caller actually offers an empty choice. Without one, "" has
      to keep meaning "unset" so the placeholder still shows. */
   const clearable = options.some((o) => (o.value ?? o) === "");
@@ -171,7 +171,13 @@ export function Pick({ value, onChange, options, placeholder = "Choose" }) {
 
   return (
     <Select value={encode(value)} onValueChange={(v) => onChange(decode(v))}>
-      <SelectTrigger className="e-control h-10" id={field?.id} aria-labelledby={field?.labelId}>
+      <SelectTrigger
+        className="e-control h-10"
+        id={field?.id}
+        aria-labelledby={label ? undefined : field?.labelId}
+        aria-label={label}
+        title={title}
+      >
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>

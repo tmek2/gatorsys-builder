@@ -29,8 +29,12 @@ export function InlineText({
   multiline = false,
   placeholder = "",
   label,
+  autoFocus = false,
 }) {
-  const [editing, setEditing] = useState(false);
+  /* A field that was just conjured by pressing "+" starts open. Adding a tag
+     and then having to find and click the empty pill you just made is two
+     gestures for one intention. */
+  const [editing, setEditing] = useState(autoFocus);
   const [draft, setDraft] = useState(value ?? "");
   const field = useRef(null);
   const press = useRef(null);
@@ -122,13 +126,14 @@ export function InlineText({
         ) {
           return;
         }
-        event.stopPropagation();
+        /* Deliberately allowed to bubble. The row under this text selects on
+           click, and editing the words of a message the composer is not aimed
+           at is how you end up typing into one message while another is the
+           one being sent to. Both things happen: the row is selected and the
+           words become a field. */
         setEditing(true);
       }}
-      onDoubleClick={(event) => {
-        event.stopPropagation();
-        setEditing(true);
-      }}
+      onDoubleClick={() => setEditing(true)}
       onKeyDown={(event) => {
         if (event.key === "Enter" || event.key === "F2") {
           event.preventDefault();

@@ -34,6 +34,60 @@ function VerifiedMark() {
   );
 }
 
+/* The server tag, and the way one is added.
+ *
+ * Discord's clan badge is a per-mockup decision — the same person is tagged in
+ * one screenshot and not in another — so it belongs on the name, where you can
+ * see whether it is there, rather than behind a sheet. With no tag set the
+ * control is a "+" that only appears while the row is hovered; with one set it
+ * is the pill itself, typed over in place. Clearing the text removes it, so
+ * add and remove are the same gesture reversed. */
+function ServerTag({ user, edit }) {
+  const [fresh, setFresh] = useState(false);
+  const has = Boolean(user.tag);
+
+  if (!edit) return has ? <span className="dc-server-tag">{user.tag}</span> : null;
+
+  if (has || fresh) {
+    return (
+      <span className="dc-server-tag dc-server-tag-live">
+        <InlineText
+          value={user.tag}
+          /* Only the pill that was just conjured opens typing. One that was
+             already there is text you clicked on, and stealing focus from a
+             re-render would fight whatever else you were doing. */
+          autoFocus={fresh && !has}
+          onChange={(next) => {
+            const tag = next.trim().slice(0, 16);
+            setFresh(Boolean(tag));
+            edit.tag(user.id, tag);
+          }}
+          label="Server tag"
+          placeholder="Tag"
+        />
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className="dc-tag-add e-no-export"
+      title="Give this member a server tag"
+      aria-label="Give this member a server tag"
+      /* The canvas selects on click and drags on move. Neither is what
+         pressing a button on the message means. */
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.stopPropagation();
+        setFresh(true);
+      }}
+    >
+      <span aria-hidden="true">+</span>
+    </button>
+  );
+}
+
 function Author({ user, edit }) {
   if (!user) return null;
   return (
@@ -55,9 +109,7 @@ function Author({ user, edit }) {
         )}
       </span>
       {user.roleIcon ? <img className="dc-role-icon" src={user.roleIcon} alt="" /> : null}
-      {/* The server tag. A small pill after the name, with the server's icon
-          in it — the client's clan badge. */}
-      {user.tag ? <span className="dc-server-tag">{user.tag}</span> : null}
+      <ServerTag user={user} edit={edit} />
       {user.bot ? (
         <span className="dc-app-badge">
           {user.verified ? <VerifiedMark /> : null}
@@ -275,13 +327,13 @@ function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, 
                 title={`Change ${user?.name ?? "this member"}'s picture`}
                 onClick={(event) => {
                   event.stopPropagation();
-                  edit.member(user?.id);
+                  edit.avatar(user?.id);
                 }}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
                     event.stopPropagation();
-                    edit.member(user?.id);
+                    edit.avatar(user?.id);
                   }
                 }}
               />

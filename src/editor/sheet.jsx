@@ -14,7 +14,7 @@
 
 import { useEffect, useRef } from "react";
 import { IconX } from "@tabler/icons-react";
-import { useOverlay } from "./use-overlay";
+import { floatingLayerOpen, useOverlay } from "./use-overlay";
 
 export function Sheet({ open, onClose, title, subtitle, wide = false, children }) {
   const state = useOverlay(open);
@@ -33,10 +33,13 @@ export function Sheet({ open, onClose, title, subtitle, wide = false, children }
   useEffect(() => {
     if (!open) return undefined;
     const onKey = (event) => {
-      if (event.key === "Escape") {
-        event.stopPropagation();
-        close.current();
-      }
+      if (event.key !== "Escape") return;
+      /* Escape belongs to the innermost thing that is open. A colour picker
+         floating over this sheet is its own layer, and closing the whole sheet
+         out from under it takes away far more than the person asked for. */
+      if (floatingLayerOpen()) return;
+      event.stopPropagation();
+      close.current();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);

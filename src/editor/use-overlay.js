@@ -40,3 +40,21 @@ export function useOverlay(open, exitMs = 200) {
 
   return { mounted, state };
 }
+
+/**
+ * Whether a floating layer of Radix's is open and should own the Escape key.
+ *
+ * Radix parks every popover, select and dropdown in one wrapper on the body,
+ * and each of them closes itself on Escape. The editor also closes its sheets
+ * and its palette on Escape — so without this, opening a colour picker inside
+ * the members sheet and pressing Escape shut the whole sheet as well.
+ *
+ * Tooltips live in the same wrapper and dismiss nothing, so they are ignored:
+ * a tooltip happening to be up because the pointer is resting on a button is
+ * not a reason for Escape to stop working.
+ */
+export function floatingLayerOpen() {
+  if (typeof document === "undefined") return false;
+  const layers = document.querySelectorAll("[data-radix-popper-content-wrapper]");
+  return [...layers].some((el) => !el.querySelector('[role="tooltip"]'));
+}

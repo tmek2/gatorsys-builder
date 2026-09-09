@@ -388,3 +388,18 @@ body {
     scroll-behavior: auto !important;
   }
 }
+
+/* Radix parks every popover, select, dropdown and tooltip in one wrapper on
+ * the body and gives it the z-index it reads off the content — which shadcn
+ * ships as 50. This app's own layers are higher than that: a sheet's scrim is
+ * 80 and the command palette is 90. So a colour picker opened inside the
+ * members sheet drew *behind* the sheet: visible in the DOM, unreachable by a
+ * pointer, and invisible to anyone looking at it.
+ *
+ * These wrappers are always the innermost thing open — you opened them from
+ * whatever is under them — so they belong above everything the editor draws.
+ * `!important` because the z-index Radix computes is written inline.
+ */
+[data-radix-popper-content-wrapper] {
+  z-index: 200 !important;
+}

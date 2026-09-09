@@ -17,7 +17,7 @@
  * second layout, and it is drawn as one.
  */
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDragOrder } from "./use-drag-order";
 import { ContextMenu } from "./menu";
 import { RenderContext } from "./context";
@@ -264,6 +264,23 @@ export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit, 
     },
     [edit, onSelect],
   );
+  /* And right-clicking the stage *around* the mockup should offer the same
+     thing. Without this the browser's own menu comes back the moment the
+     pointer leaves the picture, which is the whole complaint. Native rather
+     than a React prop because the stage belongs to the editor, not to this
+     component — and it fires before React's, so a right-click on a message is
+     left alone and handled there. */
+  useEffect(() => {
+    const el = scroller?.current;
+    if (!el || !edit) return undefined;
+    const onMenu = (event) => {
+      if (event.target instanceof Element && event.target.closest(".dc")) return;
+      openMenu(event, null);
+    };
+    el.addEventListener("contextmenu", onMenu);
+    return () => el.removeEventListener("contextmenu", onMenu);
+  }, [scroller, edit, openMenu]);
+
   /* Innermost first: a long conversation scrolls inside its own frame, and
      only when that has nowhere left to go does the stage behind it move. */
   const conversation = useRef(null);

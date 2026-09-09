@@ -150,7 +150,23 @@ export function Composer({
 }) {
   const [draft, setDraft] = useState("");
   const field = useRef(null);
+  const island = useRef(null);
   const blob = useBlob(tool);
+
+  /* The panel and the tray sit above the island, and the island is not a fixed
+     height — the bar grows to what is being typed into it. Publishing the
+     measurement means the two surfaces above it move with it instead of
+     guessing a clearance that is wrong the moment somebody writes a paragraph. */
+  useLayoutEffect(() => {
+    const el = island.current;
+    if (!el || typeof ResizeObserver === "undefined") return undefined;
+    const write = () =>
+      el.parentElement?.style.setProperty("--c-island-h", `${Math.round(el.offsetHeight)}px`);
+    write();
+    const ro = new ResizeObserver(write);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   /* The bar grows with what is in it, the way the client's does, and stops at
      a height that still leaves the mockup visible behind it. */
@@ -169,7 +185,7 @@ export function Composer({
   };
 
   return (
-    <div className="c-island e-no-export">
+    <div className="c-island e-no-export" ref={island}>
       <AuthorPill
         project={project}
         author={author}

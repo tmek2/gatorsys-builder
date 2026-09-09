@@ -77,6 +77,7 @@ import { ID } from "@/lib/ids";
 import { Palette } from "./palette";
 import { useCanvasGestures } from "./use-canvas";
 import { Sheet } from "./sheet";
+import { floatingLayerOpen } from "./use-overlay";
 import "./editor.css";
 import "./composer.css";
 
@@ -373,8 +374,24 @@ export function Builder({ user, canSignIn = true, shared = null }) {
           (p) => ({ ...p, users: p.users.map((u) => (u.id === id ? { ...u, name } : u)) }),
           `u:${id}:name`,
         ),
+      /* The server tag beside a name. Discord's clan badge is the one piece of
+         a member you set per-mockup rather than per-person, so it is on the
+         name where you can see it rather than three clicks into a sheet. */
+      tag: (id, tag) =>
+        commit(
+          (p) => ({ ...p, users: p.users.map((u) => (u.id === id ? { ...u, tag } : u)) }),
+          `u:${id}:tag`,
+        ),
       member: (id) => {
         setFocusUser(id ?? null);
+        setAvatarFor(null);
+        setSheetOpen("members");
+      },
+      /* Pressing the face means the picture, so the set of faces is already
+         open when the sheet arrives. */
+      avatar: (id) => {
+        setFocusUser(id ?? null);
+        setAvatarFor(id ?? null);
         setSheetOpen("members");
       },
       /* What the right-click menu offers, which depends on what was under the
@@ -451,6 +468,9 @@ export function Builder({ user, canSignIn = true, shared = null }) {
      is the behaviour of every dock somebody has used before. */
   /* Which member the members sheet should open on. */
   const [focusUser, setFocusUser] = useState(null);
+  /* Which member's picture somebody asked to change by clicking their face
+     on the mockup, as opposed to opening the members sheet generally. */
+  const [avatarFor, setAvatarFor] = useState(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [trayOpen, setTrayOpen] = useState(false);
   const dock = useRef(null);
@@ -777,6 +797,10 @@ export function Builder({ user, canSignIn = true, shared = null }) {
         return;
       }
       if (event.key === "Escape") {
+        /* Not while something is floating over it. A select or a colour picker
+           opened from inside a sheet closes itself on Escape, and taking the
+           sheet down in the same press is two dismissals for one key. */
+        if (floatingLayerOpen()) return;
         setPaletteOpen(false);
         setSheetOpen(null);
         return;
@@ -966,34 +990,40 @@ export function Builder({ user, canSignIn = true, shared = null }) {
 
             <span className="e-stage-rule" />
 
-            <Hint label="Which of Discord's four themes">
-              <span className="e-stage-field">
-                <Pick
-                  value={project.canvas.theme}
-                  onChange={(v) => commit((p) => ({ ...p, canvas: { ...p.canvas, theme: v } }))}
-                  options={[
-                    { value: "light", label: "Light" },
-                    { value: "ash", label: "Ash" },
-                    { value: "dark", label: "Dark" },
-                    { value: "onyx", label: "Onyx" },
-                  ]}
-                />
-              </span>
-            </Hint>
+            {/* Deliberately not wrapped in a Hint, unlike everything else on
+                this bar. A tooltip is a dismissable layer, and hovering one
+                over a Select puts it *above* the open menu in Radix's layer
+                stack — so Escape closed the tooltip, the menu stayed open, and
+                the scroll lock it holds left the whole editor unclickable. A
+                title is a tooltip the browser owns and no layer at all. */}
+            <span className="e-stage-field">
+              <Pick
+                value={project.canvas.theme}
+                onChange={(v) => commit((p) => ({ ...p, canvas: { ...p.canvas, theme: v } }))}
+                label="Discord theme"
+                title="Which of Discord's four themes"
+                options={[
+                  { value: "light", label: "Light" },
+                  { value: "ash", label: "Ash" },
+                  { value: "dark", label: "Dark" },
+                  { value: "onyx", label: "Onyx" },
+                ]}
+              />
+            </span>
 
-            <Hint label="How much of the client is drawn around the messages">
-              <span className="e-stage-field">
-                <Pick
-                  value={project.canvas.chrome}
-                  onChange={setChrome}
-                  options={[
-                    { value: "none", label: "Messages" },
-                    { value: "chat", label: "Channel" },
-                    { value: "full", label: "Window" },
-                  ]}
-                />
-              </span>
-            </Hint>
+            <span className="e-stage-field">
+              <Pick
+                value={project.canvas.chrome}
+                onChange={setChrome}
+                label="How much of the client"
+                title="How much of the client is drawn around the messages"
+                options={[
+                  { value: "none", label: "Messages" },
+                  { value: "chat", label: "Channel" },
+                  { value: "full", label: "Window" },
+                ]}
+              />
+            </span>
 
             <Hint label="Background, size, density and the client's own notices">
               <button
@@ -1326,7 +1356,7 @@ export function Builder({ user, canSignIn = true, shared = null }) {
         subtitle="Everyone who can send a message in this mockup. Pick who sent a message on the message itself."
         wide
       >
-        <UsersPanel project={project} commit={commit} onError={fail} focus={focusUser} />
+        <UsersPanel project={project} commit={commit} onError={fail} focus={focusUser} pick={avatarFor} />
       </Sheet>
 
       <Sheet
@@ -1339,7 +1369,6 @@ export function Builder({ user, canSignIn = true, shared = null }) {
           project={project}
           commit={commit}
           onError={fail}
-          onChrome={setChrome}
         />
       </Sheet>
 

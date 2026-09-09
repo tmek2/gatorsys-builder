@@ -4,10 +4,8 @@
  * who is in it, what it looks like, and where it is saved.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  IconDeviceDesktop,
-  IconDeviceMobile,
   IconPlus,
   IconTrash,
 } from "@tabler/icons-react";
@@ -65,8 +63,14 @@ export function AvatarPicker({ value, onChange, onClose, inline = false }) {
   );
 }
 
-export function UsersPanel({ project, commit, onError, focus = null }) {
-  const [picking, setPicking] = useState(null);
+export function UsersPanel({ project, commit, onError, focus = null, pick = null }) {
+  /* `pick` is somebody having clicked the face on the mockup. That gesture
+     means "change this picture", so the set opens with the sheet rather than
+     leaving a second button to find. */
+  const [picking, setPicking] = useState(pick);
+  useEffect(() => {
+    if (pick) setPicking(pick);
+  }, [pick]);
 
   const patch = (id, over) =>
     commit((p) => ({ ...p, users: p.users.map((u) => (u.id === id ? { ...u, ...over } : u)) }));
@@ -283,7 +287,7 @@ export function EmojiPanel({ project, commit, onError }) {
 
 /* --------------------------------------------------------------- canvas */
 
-export function CanvasPanel({ project, commit, onError, onChrome }) {
+export function CanvasPanel({ project, commit, onError }) {
   const canvas = project.canvas;
   /* Tagged per field: dragging the width slider is one undo step, not one per
      pixel, and moving to a different control starts a new one. */
@@ -296,47 +300,11 @@ export function CanvasPanel({ project, commit, onError, onChrome }) {
 
   return (
     <>
-      <Group title="Appearance">
-        <Field label="Discord theme" hint="The four the client ships. Ash is its default dark.">
-          <Segmented
-            value={canvas.theme}
-            onChange={(v) => set("theme", v)}
-            label="Discord theme"
-            options={[
-              { value: "light", label: "Light" },
-              { value: "ash", label: "Ash" },
-              { value: "dark", label: "Dark" },
-              { value: "onyx", label: "Onyx" },
-            ]}
-          />
-        </Field>
-
-        <Field label="Client">
-          <Segmented
-            value={canvas.platform}
-            onChange={(v) => set("platform", v)}
-            label="Client"
-            options={[
-              { value: "desktop", label: "Desktop", icon: <IconDeviceDesktop size={14} /> },
-              { value: "mobile", label: "Phone", icon: <IconDeviceMobile size={14} /> },
-            ]}
-          />
-        </Field>
-
-        <Field label="How much of the client" hint="Messages alone, the channel with its header and box, or the whole window.">
-          <Segmented
-            value={canvas.chrome}
-            onChange={onChrome}
-            label="Chrome"
-            options={[
-              { value: "none", label: "Messages" },
-              { value: "chat", label: "Channel" },
-              { value: "full", label: "Window" },
-            ]}
-          />
-        </Field>
-      </Group>
-
+      {/* The client, the theme and how much chrome is drawn used to be the
+          first three fields in here, behind a button labelled "Desktop · Ash".
+          They are the three anybody reaches for, so they are on the stage bar
+          as themselves now. This sheet is what is left: the things you set
+          once and stop thinking about. */}
       <Group title="Canvas">
         {/* The phone's width is the phone's. Leaving the slider here would be
             a control that moves and changes nothing. */}
@@ -347,6 +315,25 @@ export function CanvasPanel({ project, commit, onError, onChrome }) {
         ) : (
           <Field label="Width">
             <Slider value={canvas.width} min={320} max={1400} step={10} onChange={(v) => set("width", v)} suffix="px" />
+          </Field>
+        )}
+        {/* Where the window stops growing. Below it the frame hugs the
+            conversation; past it the conversation scrolls inside and this
+            edge is what the export stops at — so it is the single control
+            that decides how much of a long mockup ends up in the picture. */}
+        {canvas.platform === "mobile" ? null : (
+          <Field
+            label="Window height"
+            hint="A maximum, not a height. A short mockup stays short; a long one scrolls inside the window and exports at this edge."
+          >
+            <Slider
+              value={canvas.height ?? 760}
+              min={320}
+              max={1600}
+              step={10}
+              onChange={(v) => set("height", v)}
+              suffix="px"
+            />
           </Field>
         )}
         {canvas.chrome === "none" ? (

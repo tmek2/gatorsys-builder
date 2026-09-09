@@ -70,6 +70,16 @@ every test that needs the editor to respond; and it needs `REDIS_URL` in its
 environment, or the short-link tests correctly report that short links are not
 configured.
 
+The second time this bit, it looked like a UI bug rather than a stale server.
+A new `next start` lost the port race, exited with `EADDRINUSE`, and left the
+*previous* one answering — so the port still returned 200, the page still
+hydrated, and only the stylesheet 404'd. Every element was `position: static`,
+every panel measured full-width, and a dozen tests failed with "this control
+does nothing". The check that settles it in one line: fetch `/`, pull the
+first `/_next/static/css/...` href out of it, and fetch that. A stale server
+hands you a hash that is no longer on disk. Kill whatever holds the port, wait
+for it to let go, start, and prove the CSS resolves before running anything.
+
 
 Two things were making a large mockup heavier than it needed to be, and both
 were measured rather than guessed.

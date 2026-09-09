@@ -11,7 +11,8 @@
   left: 50%;
   bottom: 22px;
   transform: translateX(-50%);
-  z-index: 6;
+  /* Above both the panel and the tray: it is the way back out of either. */
+  z-index: 8;
   display: flex;
   align-items: flex-end;
   gap: 10px;
@@ -318,8 +319,14 @@
   position: absolute;
   top: 12px;
   right: 12px;
-  bottom: 12px;
-  z-index: 7;
+  /* Stops above the island rather than running to the floor. It used to reach
+     the bottom and sit a layer above, which put it directly over the right end
+     of the island — so opening Embeds covered the rail you open Embeds with,
+     and there was no way back to Extras or out. The clearance is the island's
+     own measured height, because the composer grows with what is typed into
+     it and any fixed number here is wrong at some paragraph length. */
+  bottom: calc(var(--c-island-h, 62px) + 34px);
+  z-index: 5;
   display: flex;
   flex-direction: column;
   width: min(420px, 42vw);
@@ -376,7 +383,7 @@
 .c-tray {
   position: absolute;
   left: 50%;
-  bottom: 80px;
+  bottom: calc(var(--c-island-h, 62px) + 26px);
   transform: translateX(-50%);
   z-index: 5;
   display: flex;
