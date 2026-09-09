@@ -40,6 +40,14 @@
   display: flex;
   flex: 1;
   min-width: 0;
+  /* And `min-height`, which is the half that was missing.
+     A flex item defaults to `min-height: auto` — it refuses to shrink below
+     its content — so on the phone, where this column is stacked rather than
+     laid beside a rail, fourteen messages made it 1129px tall inside an 836px
+     window. The frame clipped it and the conversation inside had nothing to
+     scroll: the overflow was outside the scroller, not in it. That is the
+     whole of "can't scroll on phone mockup". */
+  min-height: 0;
   flex-direction: column;
   background: var(--chat-background-default);
 }
@@ -224,6 +232,17 @@
   font-size: 12px;
   font-weight: 600;
   line-height: 16px;
+}
+
+/* A pill with nothing in it is not a pill. It is drawn while somebody is
+   typing into it and dropped from the export, so a "+" pressed and abandoned
+   never becomes a grey word in the picture. */
+.dc-server-tag[data-empty="true"] {
+  opacity: 0.5;
+}
+.dc-export .dc-server-tag[data-empty="true"],
+[data-exporting="true"] .dc-server-tag[data-empty="true"] {
+  display: none;
 }
 
 /* The editable pill. Same box as the drawn one — the tag must not resize the

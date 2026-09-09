@@ -31,6 +31,8 @@ export function InlineText({
   label,
   autoFocus = false,
   open = false,
+  onCancel,
+  onBlurEmpty,
 }) {
   /* A field that was just conjured by pressing "+" starts open. Adding a tag
      and then having to find and click the empty pill you just made is two
@@ -73,10 +75,15 @@ export function InlineText({
   const commit = () => {
     setEditing(false);
     if (draft !== value) onChange(draft);
+    /* Closed with nothing in it. A caller that only draws this field because
+       something exists needs to know it no longer does — otherwise it keeps
+       drawing an empty box with a placeholder in it. */
+    if (!draft.trim()) onBlurEmpty?.();
   };
   const cancel = () => {
     setDraft(value ?? "");
     setEditing(false);
+    onCancel?.();
   };
 
   if (editing) {

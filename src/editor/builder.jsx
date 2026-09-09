@@ -71,7 +71,6 @@ import {
   readShareLink,
   shareLink,
 } from "./export";
-import { AUTO_EVERY_MS, takeSnapshot } from "@/lib/backups";
 import { forkProject } from "@/lib/fork";
 import { ID } from "@/lib/ids";
 import { Palette } from "./palette";
@@ -218,22 +217,11 @@ export function Builder({ user, canSignIn = true, shared = null }) {
     return () => window.clearTimeout(timer);
   }, [project, slug, linkedId, loaded, fail]);
 
-  /* An automatic snapshot, on a timer, and only when something has actually
-     changed since the last one. A snapshot per interval regardless would fill
-     the list with twelve copies of a mockup nobody touched. */
-  const snapshotted = useRef("");
-  useEffect(() => {
-    if (!loaded) return undefined;
-    const tick = window.setInterval(() => {
-      const stamp = JSON.stringify(project);
-      if (stamp === snapshotted.current) return;
-      snapshotted.current = stamp;
-      takeSnapshot(project).catch(() => {
-        // A full disk should cost the snapshot, not the session.
-      });
-    }, AUTO_EVERY_MS);
-    return () => window.clearInterval(tick);
-  }, [project, loaded]);
+  /* No automatic snapshots.
+     There was a timer taking one every ninety seconds and keeping the last
+     twelve, which filled the backups list with a dozen near-identical rows
+     nobody asked for and nobody could tell apart. Undo covers stepping back
+     through a session; a backup is a thing you decide to keep. */
 
   useEffect(() => {
     if (!toast) return undefined;

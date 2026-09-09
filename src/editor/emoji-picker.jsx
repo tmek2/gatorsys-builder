@@ -21,6 +21,7 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import { IconMoodSmile, IconSearch } from "@tabler/icons-react";
+import { Icon } from "@/discord/icon";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -196,8 +197,11 @@ export function EmojiInsert({ onPick, custom }) {
       <Tooltip>
         <TooltipTrigger asChild>
           <PopoverTrigger asChild>
-            <button type="button" className="e-icon-btn" aria-label="Insert an emoji">
-              <IconMoodSmile size={15} />
+            {/* The client's own smiley, out of the icon library, not a
+                generic one from the interface set. Every other button on the
+                island is Discord's; this one was the odd face out. */}
+            <button type="button" className="e-icon-btn c-bar-btn" aria-label="Insert an emoji">
+              <Icon name="emoji" size={20} />
             </button>
           </PopoverTrigger>
         </TooltipTrigger>

@@ -24,6 +24,7 @@ import { RenderContext } from "./context";
 import { Icon } from "./icon";
 import { InlineText } from "./inline";
 import { roleColor } from "@/lib/model";
+import { groupsWith } from "@/lib/clock";
 import { Message } from "./message";
 import { ChannelStart, DateDivider, FollowChannel, NewDivider, NoAccess, UnreadBanner } from "./system";
 import "./tokens.css";
@@ -178,9 +179,12 @@ function ChannelList({ canvas, edit, onMenu }) {
               )}
             </div>
           ) : (
+            <Fragment key={`c${row.at}`}>
+            {/* The same mark the messages use. A drag with no indicator is a
+                drag that asks you to guess where it will land. */}
+            {order.lineAt === row.at ? <span className="dc-drop-line" aria-hidden="true" /> : null}
             <div
               className={`dc-sidebar-channel${row.channel.name === current ? " dc-sidebar-on" : ""}`}
-              key={`c${row.at}`}
               data-row
               data-held={order.drag?.from === row.at ? "true" : undefined}
               onContextMenu={onMenu ? (event) => onMenu(event, null, "channels") : undefined}
@@ -188,7 +192,13 @@ function ChannelList({ canvas, edit, onMenu }) {
               {edit ? (
                 <button
                   type="button"
-                  className="dc-hash dc-hash-live e-no-export"
+                  /* Not `e-no-export`. The glyph is part of the picture — a
+                     channel row without its hash is not a channel row — and
+                     only the *chrome* of a control should be dropped from the
+                     raster. This one has none: no border, no background, no
+                     focus ring at rest, so it rasterises exactly as the plain
+                     icon did. */
+                  className="dc-hash dc-hash-live"
                   title={`${CHANNEL_KINDS.find((k) => k.id === (row.channel.kind || "text"))?.label} channel — press to change`}
                   aria-label="Change the channel type"
                   onClick={() => {
@@ -257,8 +267,10 @@ function ChannelList({ canvas, edit, onMenu }) {
                 </span>
               ) : null}
             </div>
+            </Fragment>
           ),
         )}
+        {order.lineAt === channels.length ? <span className="dc-drop-line" aria-hidden="true" /> : null}
         {edit ? (
           <div className="dc-sidebar-adds e-no-export">
             <button
@@ -339,11 +351,19 @@ function PhoneStatus({ canvas, edit }) {
 }
 
 function ChannelHeader({ canvas, mobile, edit }) {
+  /* The glyph is the channel's, not a hash on principle. Changing a channel's
+     type in the sidebar has to change it here too — the header and the row are
+     the same channel, and having them disagree is the mockup contradicting
+     itself in two places a screenshot shows at once. */
+  const here = (canvas.channels ?? []).map(asChannel).find((c) => c.name === (canvas.channel?.name || "general"));
+  const glyph =
+    CHANNEL_KINDS.find((k) => k.id === (here?.kind ?? canvas.channelKind ?? "text"))?.icon ?? "channel-text";
+
   if (mobile) {
     return (
       <header className="dc-m-head">
         <Icon name="caret-left" size={22} className="dc-m-back" />
-        <Icon name="channel-text" size={20} className="dc-hash" />
+        <Icon name={glyph} size={20} className="dc-hash" />
         <span className="dc-m-head-name">
           {edit ? (
             <InlineText
@@ -367,7 +387,7 @@ function ChannelHeader({ canvas, mobile, edit }) {
   }
   return (
     <header className="dc-head">
-      <Icon name="channel-text" size={20} className="dc-hash" />
+      <Icon name={glyph} size={20} className="dc-hash" />
       <span className="dc-head-name">
         {edit ? (
           <InlineText
@@ -456,9 +476,10 @@ function MemberList({ canvas, users, roles = [], edit, scrollers, onMenu }) {
             const held = order.drag?.from === i;
             const landing = order.drag && order.drag.to === i && order.drag.from !== i;
             return (
+              <Fragment key={u.id}>
+              {order.lineAt === i ? <span className="dc-drop-line" aria-hidden="true" /> : null}
               <div
                 className="dc-member"
-                key={u.id}
                 data-row
                 data-offline={u.status === "offline" ? "true" : undefined}
                 data-held={held ? "true" : undefined}
@@ -510,10 +531,12 @@ function MemberList({ canvas, users, roles = [], edit, scrollers, onMenu }) {
                   </button>
                 ) : null}
               </div>
+              </Fragment>
             );
           })}
         </Fragment>
       ))}
+      {order.lineAt === flat.length ? <span className="dc-drop-line" aria-hidden="true" /> : null}
       {edit ? (
         <button type="button" className="dc-members-add e-no-export" onClick={() => edit.addMember()}>
           <Icon name="add-friends" size={16} /> Add a member
@@ -690,7 +713,7 @@ export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit, 
       ) : null}
       {canvas.showDateDivider ? <DateDivider label={canvas.dateLabel || "Today"} /> : null}
       {(project.messages ?? []).map((message, i) => (
-        <div key={message.id} {...order.rowProps(i)}>
+        <div key={message.id} data-row {...order.rowProps(i)}>
           {/* Where it will land, drawn as a line between rows rather than as a
               wash on one of them. "This row is highlighted" is ambiguous —
               above it or below it? — and a drag that cannot say where it is
@@ -699,6 +722,13 @@ export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit, 
           {canvas.showNewDivider && i === (project.messages.length - 1) ? <NewDivider /> : null}
           <Message
             message={message}
+            /* Grouped by what is around it, not by a flag on the message.
+               Discord stacks consecutive messages from one person under a
+               single header and breaks the stack after seven minutes, and a
+               mockup that repeats the avatar and the name on every line is the
+               thing that gives it away at a glance. The flag is still honoured
+               when it is set, so a mockup that asked for a stack keeps it. */
+            grouped={message.grouped || groupsWith(project.messages[i - 1], message)}
             replyTo={message.reply ? byId.get(message.reply) : undefined}
             selected={selectedId === message.id}
             onSelect={onSelect ? pick : undefined}

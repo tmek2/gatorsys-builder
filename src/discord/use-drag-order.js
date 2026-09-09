@@ -166,7 +166,13 @@ export function useDragOrder({ onMove, scrollers = [] }) {
        press, and a press on a message is a click or the start of a text
        selection — both of which `preventDefault` on pointerdown would eat. */
     event.stopPropagation();
-    const rows = [...node.children]
+    /* The rows, and only the rows.
+       Walking `children` was fine for a stream of messages, where every child
+       is one — but the member list interleaves headings and ends with an "add"
+       button, and counting those as rows put the landing slot two places out.
+       Anything draggable marks itself `data-row`. */
+    const marked = node.querySelectorAll("[data-row]");
+    const rows = [...(marked.length ? marked : node.children)]
       .map((child) => child.querySelector("[data-id]") ?? child)
       .map((n) => {
         const r = n.getBoundingClientRect();

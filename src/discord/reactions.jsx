@@ -11,8 +11,9 @@
 
 import { Emoji } from "./emoji-node";
 import { Icon } from "./icon";
+import { InlineText } from "./inline";
 
-export function Reactions({ reactions = [] }) {
+export function Reactions({ reactions = [], edit }) {
   if (!reactions.length) return null;
   return (
     <div className="dc-reactions">
@@ -22,7 +23,28 @@ export function Reactions({ reactions = [] }) {
           className={`dc-reaction${r.me ? " dc-reaction-me" : ""}${r.burst ? " dc-reaction-burst" : ""}`}
         >
           <Emoji text={r.src || r.emoji} className="dc-reaction-emoji" />
-          <span className="dc-reaction-count">{r.count}</span>
+          <span className="dc-reaction-count">
+            {/* The number is the whole point of a reaction in a screenshot.
+                Typed on the pill rather than found in a list of reactions
+                three panels away. */}
+            {edit ? (
+              <InlineText
+                value={String(r.count ?? 0)}
+                onChange={(v) =>
+                  edit(
+                    reactions.map((x) =>
+                      x.id === r.id
+                        ? { ...x, count: Math.max(0, parseInt(v.replace(/[^0-9]/g, ""), 10) || 0) }
+                        : x,
+                    ),
+                  )
+                }
+                label="How many reacted"
+              />
+            ) : (
+              r.count
+            )}
+          </span>
         </span>
       ))}
       <span className="dc-reaction dc-reaction-add" aria-hidden="true">

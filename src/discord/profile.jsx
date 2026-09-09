@@ -51,7 +51,10 @@ function RoleChip({ role, user, edit }) {
       <button
         type="button"
         ref={dot}
-        className="dc-profile-role-dot dc-profile-role-dot-live e-no-export"
+        /* Not `e-no-export`: the coloured dot is the role, and a role chip
+           without it is not a role chip. It is a button here, but a button
+           with no chrome of its own — it rasterises as the dot it draws. */
+        className="dc-profile-role-dot dc-profile-role-dot-live"
         style={{ background: role.color || "#949ba4" }}
         title={`Colour and settings for ${role.name}`}
         aria-label={`Colour and settings for ${role.name}`}

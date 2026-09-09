@@ -674,3 +674,26 @@
   line-height: 1.4;
   text-align: center;
 }
+
+/* Discord's sticker packs come with names, and a grid of two hundred stickers
+   with no headings is a wall. */
+.c-pick-pack {
+  margin: 6px 0 4px;
+  color: var(--g-ink-dim);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+/* A GIF is a landscape thing and squaring it off makes every result a crop of
+   somebody's chin. */
+.c-pick-grid-wide {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.c-pick-grid-wide .c-pick-cell {
+  aspect-ratio: 4 / 3;
+}
+.c-pick-grid-wide .c-pick-cell img {
+  object-fit: cover;
+  border-radius: 6px;
+}

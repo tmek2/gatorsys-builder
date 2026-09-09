@@ -103,3 +103,41 @@ export function restamp(messages, burst = BURST) {
     return { ...message, timestamp: writeStamp({ ...anchor, hour, minute }) };
   });
 }
+
+/* How long Discord will keep stacking messages from the same person.
+ *
+ * The client groups consecutive messages from one author under a single header
+ * — one avatar, one name, one timestamp — and breaks the group when somebody
+ * else speaks, when the day changes, or when more than seven minutes have
+ * passed. Seven is the client's own number.
+ */
+export const GROUP_WINDOW_MINUTES = 7;
+
+/** Minutes into the day, for two stamps that can be read. */
+const minutes = (stamp) => {
+  const at = readStamp(stamp);
+  return at ? { day: at.day, total: at.hour * 60 + at.minute } : null;
+};
+
+/**
+ * Whether `message` should be drawn under `previous` without its own header.
+ *
+ * A reply, a slash-command header, a system message or an author change always
+ * starts a new group — the client pulls all of those out of a stack — and so
+ * does a gap of more than seven minutes.
+ */
+export function groupsWith(previous, message) {
+  if (!previous || !message) return false;
+  if (previous.kind === "system" || message.kind === "system") return false;
+  if (previous.user !== message.user) return false;
+  if (message.reply || message.interaction || message.forwarded) return false;
+
+  const a = minutes(previous.timestamp);
+  const b = minutes(message.timestamp);
+  /* A stamp somebody typed by hand may not parse. Two that cannot be read are
+     treated as the same moment, which is what a mockup with one timestamp
+     repeated down the column means. */
+  if (!a || !b) return previous.timestamp === message.timestamp;
+  if (a.day !== b.day) return false;
+  return b.total - a.total >= 0 && b.total - a.total <= GROUP_WINDOW_MINUTES;
+}

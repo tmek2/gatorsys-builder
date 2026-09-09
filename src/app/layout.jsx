@@ -55,17 +55,14 @@ export const metadata = {
      document's own links may never render — and a 404 in the console is
      noise somebody has to rule out later.
      
-     The touch icon is separate and deliberately not transparent. iOS does not
-     composite a transparent home-screen or bookmark icon onto the page's
-     colours — it composites it onto black — so a pink drawing on nothing came
-     out as a pink drawing on a black tile. This one brings its own ground.
-     iOS rounds the corners itself, so the square stays square.
-
-     The 192 and 512 stay in the manifest and out of `icon`. Listed there,
-     Chrome preferred the biggest PNG for the tab — and that one carries the
-     plate, so the tab went back to a pink gator on a black tile. The tab gets
-     the SVG and the .ico, both of which are transparent; the plate is only
-     for the surfaces that composite onto black. */
+     Every one of these is transparent, including the touch icon.
+     There was a dark plate behind the touch icon and the two PNGs, on the
+     theory that iOS composites a transparent home-screen icon onto black and
+     would look better with its own ground. Whatever the theory, the plate is
+     what kept appearing behind the logo in a browser tab — three separate
+     reports of "the tab has a black background" — because something in the
+     chain kept picking the plated file over the flat one. Nothing ships a
+     ground now, so nothing can draw one. */
   icons: {
     icon: [
       { url: "/favicon.svg", type: "image/svg+xml" },

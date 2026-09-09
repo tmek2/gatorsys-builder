@@ -56,7 +56,11 @@ export const TOOLS = [
  */
 function MediaPick({ icon, label, hint, what, kind, accept = "image/*", size = 20, project, onPick }) {
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState("mockup");
+  /* Open on the real thing when there is one — Discord's sticker packs, or
+     Tenor — and on what is already in the mockup otherwise. */
+  const [tab, setTab] = useState(kind === "sticker" ? "packs" : kind === "gif" ? "tenor" : "mockup");
+  /* Fetched once, when the tab that needs it is first looked at. */
+  const [remote, setRemote] = useState(null);
   const [term, setTerm] = useState("");
   const [link, setLink] = useState("");
   const [busy, setBusy] = useState(false);
@@ -81,6 +85,27 @@ function MediaPick({ icon, label, hint, what, kind, accept = "image/*", size = 2
       document.removeEventListener("keydown", key);
     };
   }, [open]);
+
+  /* Discord's own sticker packs, and Tenor for the GIFs, both through this
+     app's own routes: the upstreams send no CORS header and a key must not
+     reach the browser. Loaded when the tab is opened rather than on mount, so
+     a picker somebody only wanted for an upload costs no request. */
+  useEffect(() => {
+    if (!open) return undefined;
+    if (tab !== "packs" && tab !== "tenor") return undefined;
+    let alive = true;
+    const url = tab === "packs" ? "/api/stickers" : `/api/gifs?q=${encodeURIComponent(term.trim())}`;
+    setRemote((r) => (r?.for === tab && tab === "packs" ? r : null));
+    fetch(url)
+      .then((r) => r.json())
+      .then((body) => alive && setRemote({ for: tab, ...body }))
+      .catch(() => alive && setRemote({ for: tab, unavailable: true }));
+    return () => {
+      alive = false;
+    };
+    /* The GIF tab re-fetches as the search changes; the sticker packs do not
+       depend on it. */
+  }, [open, tab, kind === "gif" ? term : ""]);
 
   const mine = useMemo(
     () => (project ? projectImages(project) : []),
@@ -119,6 +144,8 @@ function MediaPick({ icon, label, hint, what, kind, accept = "image/*", size = 2
   /* Sticker art is what the emoji library is good for; a still emoji is not a
      GIF and offering it as one would be a lie. */
   const tabs = [
+    ...(kind === "sticker" ? [{ id: "packs", label: "Stickers" }] : []),
+    ...(kind === "gif" ? [{ id: "tenor", label: "GIFs" }] : []),
     { id: "mockup", label: "In this mockup" },
     ...(kind === "sticker" ? [{ id: "emoji", label: "Emoji" }] : []),
     { id: "add", label: "Upload or link" },
@@ -212,7 +239,76 @@ function MediaPick({ icon, label, hint, what, kind, accept = "image/*", size = 2
                 aria-label="Search"
                 onChange={(event) => setTerm(event.target.value)}
               />
-              <div className="c-pick-grid">
+              {/* Discord's packs, or Tenor. Both can be missing — one because
+                  the upstream is unreachable, the other because this
+                  deployment has no Tenor key — and a picker that says so is
+                  better than a search box that silently returns nothing. */}
+              {tab === "packs" || tab === "tenor" ? (
+                remote?.for !== tab ? (
+                  <p className="c-pick-empty">Loading…</p>
+                ) : remote.unconfigured ? (
+                  <p className="c-pick-empty">
+                    GIFs come from Tenor, and this deployment has no Tenor key set.
+                    The other tabs still work.
+                  </p>
+                ) : remote.unavailable ? (
+                  <p className="c-pick-empty">
+                    Could not reach {tab === "packs" ? "Discord" : "Tenor"} just now.
+                  </p>
+                ) : tab === "tenor" ? (
+                  <div className="c-pick-grid c-pick-grid-wide">
+                    {(remote.gifs ?? []).map((gif) => (
+                      <button
+                        key={gif.id}
+                        type="button"
+                        className="c-pick-cell"
+                        title={gif.label}
+                        aria-label={gif.label}
+                        onClick={() => choose(gif.src)}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={gif.preview} alt="" loading="lazy" />
+                      </button>
+                    ))}
+                    {(remote.gifs ?? []).length ? null : (
+                      <p className="c-pick-empty">Nothing matched that.</p>
+                    )}
+                  </div>
+                ) : (
+                  (remote.packs ?? [])
+                    .map((pack) => ({
+                      ...pack,
+                      stickers: term.trim()
+                        ? pack.stickers.filter((x) =>
+                            x.name.toLowerCase().includes(term.trim().toLowerCase()),
+                          )
+                        : pack.stickers,
+                    }))
+                    .filter((pack) => pack.stickers.length)
+                    .map((pack) => (
+                      <div key={pack.id}>
+                        <div className="c-pick-pack">{pack.name}</div>
+                        <div className="c-pick-grid">
+                          {pack.stickers.map((sticker) => (
+                            <button
+                              key={sticker.id}
+                              type="button"
+                              className="c-pick-cell"
+                              title={sticker.name}
+                              aria-label={sticker.name}
+                              onClick={() => choose(sticker.src)}
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={sticker.src} alt="" loading="lazy" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                )
+              ) : null}
+
+              <div className="c-pick-grid" hidden={tab === "packs" || tab === "tenor"}>
                 {tab === "mockup"
                   ? shownMine.map((item) => (
                       <button
@@ -241,7 +337,7 @@ function MediaPick({ icon, label, hint, what, kind, accept = "image/*", size = 2
                       </button>
                     ))}
               </div>
-              {(tab === "mockup" ? shownMine : shownEmoji).length ? null : (
+              {tab === "packs" || tab === "tenor" || (tab === "mockup" ? shownMine : shownEmoji).length ? null : (
                 <p className="c-pick-empty">
                   {tab === "mockup"
                     ? "Nothing here yet. Anything you add to this mockup shows up in this list."

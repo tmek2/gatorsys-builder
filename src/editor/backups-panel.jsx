@@ -31,9 +31,8 @@ import {
   IconUpload,
 } from "@tabler/icons-react";
 import {
-  AUTO_KEEP,
   deleteBackup,
-  listAll,
+  listBackups,
   readBackup,
   renameBackup,
   saveBackup,
@@ -129,7 +128,7 @@ export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink,
   const linked = (rows ?? []).find((r) => r.id === linkedId) ?? null;
 
   const refreshLocal = useCallback(() => {
-    listAll()
+    listBackups()
       .then(setRows)
       .catch(() => {
         setRows([]);
@@ -288,8 +287,9 @@ export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink,
     refreshLocal();
   };
 
+  /* Every row is one somebody made. The `auto` ones are gone; anything left
+     over from before is filtered out here rather than shown as a mystery. */
   const named = (rows ?? []).filter((r) => !r.auto);
-  const autos = (rows ?? []).filter((r) => r.auto);
   const hit = (r) => r.name.toLowerCase().includes(query.trim().toLowerCase());
   const shownNamed = query.trim() ? named.filter(hit) : named;
   const exact = named.some((r) => r.name.toLowerCase() === query.trim().toLowerCase());
@@ -391,28 +391,10 @@ export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink,
           </ul>
         )}
 
-        {/* The automatic ones follow the ones you made, under a rule rather
-            than in a box of their own: same list, quieter half. They are what
-            covers "I pasted over everything", so they belong where somebody
-            looking for a way back is already looking. */}
-        {autos.length ? (
-          <>
-            <p className="b-auto-head">
-              Taken automatically, last {AUTO_KEEP} kept
-            </p>
-            <ul className="b-list b-list-auto">
-              {autos.map((row) => (
-                <BackupRow
-                  key={row.id}
-                  row={row}
-                  busy={busy}
-                  onOpen={() => open(row.id)}
-                  onDelete={() => remove(row.id)}
-                />
-              ))}
-            </ul>
-          </>
-        ) : null}
+        {/* There used to be a second list here of snapshots the editor took
+            on a timer. It filled this panel with a dozen near-identical rows
+            nobody asked for and nobody could tell apart. Undo covers stepping
+            back through a session; a backup is a thing you decide to keep. */}
       </div>
 
       {/* The cloud copies join the same list when there are any, marked with a

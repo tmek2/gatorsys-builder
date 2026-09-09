@@ -50,7 +50,7 @@ function ServerTag({ user, edit }) {
 
   if (has || fresh) {
     return (
-      <span className="dc-server-tag dc-server-tag-live">
+      <span className="dc-server-tag dc-server-tag-live e-no-export-empty" data-empty={has ? undefined : "true"}>
         <InlineText
           value={user.tag}
           /* Only the pill that was just conjured opens typing. One that was
@@ -62,6 +62,12 @@ function ServerTag({ user, edit }) {
             setFresh(Boolean(tag));
             edit.tag(user.id, tag);
           }}
+          /* Pressing "+" and then clicking away leaves nothing typed, and an
+             empty pill with the word "Tag" greyed inside it is a word nobody
+             wrote turning up in the export. Closing with nothing in it puts
+             the control back to the "+". */
+          onCancel={() => setFresh(false)}
+          onBlurEmpty={() => setFresh(false)}
           label="Server tag"
           placeholder="Tag"
         />
@@ -147,7 +153,7 @@ function ReplyLine({ target, users }) {
 }
 
 /* "Name used /command" — the header above an interaction response. */
-function InteractionLine({ interaction, users }) {
+function InteractionLine({ interaction, users, edit }) {
   if (!interaction) return null;
   const author = users.find((u) => u.id === interaction.user);
   return (
@@ -158,7 +164,20 @@ function InteractionLine({ interaction, users }) {
         {author?.name}
       </span>
       <span className="dc-interaction-used">
-        used <span className="dc-mention dc-mention-command">/{interaction.command}</span>
+        used{" "}
+        <span className="dc-mention dc-mention-command">
+          /
+          {edit ? (
+            <InlineText
+              value={interaction.command}
+              onChange={(command) => edit({ ...interaction, command })}
+              label="Which command"
+              placeholder="command"
+            />
+          ) : (
+            interaction.command
+          )}
+        </span>
       </span>
     </div>
   );
@@ -241,7 +260,7 @@ function ThreadTag({ thread, edit }) {
   );
 }
 
-function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, landing, onMenu }) {
+function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, landing, onMenu, grouped: stacked }) {
   const { users, roles, edit } = useContext(RenderContext);
   const [stamping, setStamping] = useState(false);
   const clock = useRef(null);
@@ -255,7 +274,7 @@ function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, 
   /* A grouped message loses its avatar and its author line, but never its
      reply line or its command header: both of those force it out of the
      group in the client, so a grouped message that has one is drawn full. */
-  const grouped = message.grouped && !target && !message.interaction;
+  const grouped = (stacked ?? message.grouped) && !target && !message.interaction;
 
   return (
     <article
@@ -355,7 +374,13 @@ function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, 
           when the mockup asks for it, because it is in most screenshots. */}
       {message.toolbar ? <HoverToolbar toolbar={message.toolbar} /> : null}
       {target ? <ReplyLine target={target} users={users} /> : null}
-      {message.interaction ? <InteractionLine interaction={message.interaction} users={users} /> : null}
+      {message.interaction ? (
+        <InteractionLine
+          interaction={message.interaction}
+          users={users}
+          edit={edit ? (interaction) => edit.patch(message.id, { interaction }, "interaction") : undefined}
+        />
+      ) : null}
 
       <div className="dc-gutter">
         {grouped ? (
@@ -547,7 +572,12 @@ function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, 
             edit={edit}
           />
         ) : null}
-        {message.reactions?.length ? <Reactions reactions={message.reactions} /> : null}
+        {message.reactions?.length ? (
+          <Reactions
+            reactions={message.reactions}
+            edit={edit ? (reactions) => edit.patch(message.id, { reactions }, "reactions") : undefined}
+          />
+        ) : null}
 
         {message.thread ? (
           <ThreadTag
