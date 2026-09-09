@@ -241,7 +241,7 @@ function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, 
           belong to a message, so they live on the message rather than in a
           list beside it that has to be kept in sync with what is selected. */}
       {edit ? (
-        <div className="dc-rowtools" aria-label="This message">
+        <div className="dc-rowtools e-no-export" aria-label="This message">
           <span
             className="dc-rowtools-grip"
             role="button"
