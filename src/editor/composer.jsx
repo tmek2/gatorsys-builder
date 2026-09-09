@@ -18,6 +18,8 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
+  IconArrowBackUp,
+  IconArrowForwardUp,
   IconChevronDown,
   IconLayoutGrid,
   IconPencil,
@@ -463,6 +465,10 @@ export function Composer({
   onSend,
   onTool,
   onAdd,
+  onUndo,
+  onRedo,
+  canUndo,
+  canRedo,
   channel,
   emojis,
 }) {
@@ -579,6 +585,21 @@ export function Composer({
           />
           <EmojiInsert onPick={(emoji) => setDraft((d) => d + emoji)} custom={emojis} />
         </span>
+
+        {/* Only on a phone, where there is no Enter key to speak of: a soft
+            keyboard's return is a line break as often as it is a send, and a
+            composer whose only way to commit is a key somebody has to guess at
+            is a composer that swallows what you wrote. */}
+        <button
+          type="button"
+          className="c-send"
+          onClick={send}
+          disabled={!draft.trim()}
+          aria-label="Send this message"
+          title="Send"
+        >
+          <Icon name="send" size={18} />
+        </button>
       </div>
 
       {/* Everything the message can carry, on the side the message is on.
@@ -588,6 +609,32 @@ export function Composer({
           told about a fade. */}
       <div className="c-tools" role="group" aria-label="Edit this message" {...blob.boxProps}>
         <Blob />
+        {/* Undo and redo, on a phone only.
+            They are in the top bar everywhere else, and on a phone the top bar
+            could not hold them and the name of the document at the same time.
+            Here is the better place for them anyway: a phone is held at the
+            bottom, and the one control somebody reaches for in a hurry should
+            not be the one furthest from the thumb. */}
+        <span className="c-undo">
+          <button
+            type="button"
+            onClick={onUndo}
+            disabled={!canUndo}
+            aria-label="Undo"
+            title="Undo"
+          >
+            <IconArrowBackUp size={18} stroke={1.9} />
+          </button>
+          <button
+            type="button"
+            onClick={onRedo}
+            disabled={!canRedo}
+            aria-label="Redo"
+            title="Redo"
+          >
+            <IconArrowForwardUp size={18} stroke={1.9} />
+          </button>
+        </span>
         {TOOLS.map(({ id, label, hint, Glyph }) => (
           <Hint key={id} label={hint}>
             <button

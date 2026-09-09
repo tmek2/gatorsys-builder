@@ -12,13 +12,27 @@
  * whatever you opened.
  */
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { IconX } from "@tabler/icons-react";
 import { floatingLayerOpen, useOverlay } from "./use-overlay";
+
+/* Where a flick ends up, rather than where the finger left off.
+ *
+ * Apple's own projection out of Designing Fluid Interfaces: exponential decay
+ * at the scroll deceleration rate, not the textbook v²/2a. A short fast flick
+ * and a long slow drag both mean "put it away", and only a projection tells
+ * you which of the two just happened. */
+const project = (velocity, deceleration = 0.998) =>
+  ((velocity / 1000) * deceleration) / (1 - deceleration);
 
 export function Sheet({ open, onClose, title, subtitle, wide = false, children }) {
   const state = useOverlay(open);
   const box = useRef(null);
+  /* How far the sheet has been pulled down, in pixels, while a drag is in
+     progress. Null when nothing is being dragged, which is also what puts the
+     CSS transition back in charge of the way out. */
+  const [pulled, setPulled] = useState(null);
+  const pull = useRef(null);
 
   /* The live handler, read through a ref. `onClose` is written inline at every
      call site, so it is a new function on every render of the editor — and an
@@ -54,6 +68,52 @@ export function Sheet({ open, onClose, title, subtitle, wide = false, children }
     return () => window.clearTimeout(id);
   }, [open]);
 
+  /* Pulling it closed.
+   *
+   * The bar at the top of a sheet on a phone is a handle, and a handle that
+   * does not move when you pull it is a picture of a handle. It tracks the
+   * finger one to one downwards and rubber-bands upwards — there is nothing
+   * above the top of a sheet, and resistance says so better than a hard stop.
+   * At release, a pull past a third of the sheet or a flick that projects past
+   * it closes; anything else springs back. */
+  const grab = useCallback((event) => {
+    if (event.button !== undefined && event.button !== 0) return;
+    const node = box.current;
+    if (!node) return;
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    pull.current = {
+      y: event.clientY,
+      at: event.timeStamp,
+      last: event.clientY,
+      velocity: 0,
+      height: node.getBoundingClientRect().height,
+    };
+    setPulled(0);
+  }, []);
+
+  const drag = useCallback((event) => {
+    const p = pull.current;
+    if (!p) return;
+    const dy = event.clientY - p.y;
+    const dt = event.timeStamp - p.at;
+    /* Velocity from the last move rather than from the whole gesture: what
+       matters at release is how fast the finger was going *then*. */
+    if (dt > 0) p.velocity = ((event.clientY - p.last) / dt) * 1000;
+    p.last = event.clientY;
+    p.at = event.timeStamp;
+    setPulled(dy > 0 ? dy : (dy * 34) / (34 - dy));
+  }, []);
+
+  const drop = useCallback(() => {
+    const p = pull.current;
+    pull.current = null;
+    if (!p) return;
+    const travelled = p.last - p.y;
+    const ends = travelled + project(p.velocity);
+    setPulled(null);
+    if (ends > p.height / 3) close.current();
+  }, []);
+
   if (!state.mounted) return null;
 
   return (
@@ -68,7 +128,26 @@ export function Sheet({ open, onClose, title, subtitle, wide = false, children }
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
+        style={
+          pulled === null
+            ? undefined
+            : /* No transition while a finger is on it: the sheet is being moved
+                 by the hand, not animated towards where the hand is. */
+              { transform: `translateY(${Math.max(0, pulled)}px)`, transition: "none" }
+        }
       >
+        {/* Drawn only on a phone, where the sheet is a sheet. The row is the
+            target, not the five-point bar inside it. */}
+        <div
+          className="e-sheet-grab"
+          onPointerDown={grab}
+          onPointerMove={drag}
+          onPointerUp={drop}
+          onPointerCancel={drop}
+          aria-hidden="true"
+        >
+          <span />
+        </div>
         <header className="e-sheet-head">
           <div className="e-sheet-headings">
             <h2>{title}</h2>

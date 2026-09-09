@@ -1076,59 +1076,23 @@
   }
 }
 
-/* ------------------------------------------------------------- the panes */
-
-/* The switcher is drawn only where the columns have collapsed. */
-.e-panes {
-  display: none;
-}
-
+/* The panes are gone.
+ *
+ * They belonged to the three-column editor — an outline on the left, the
+ * mockup in the middle, a form on the right — and to a switcher along the
+ * bottom for picking between them on a narrow screen. That editor was
+ * replaced by this one, where the mockup *is* the editor, and the switcher
+ * went with it. What did not go was this block, and it was live: below 1080
+ * points it hid `.e-stage` unless `data-pane` said "preview", and opening
+ * Extras still set that attribute to "inspector" — a pane whose element no
+ * longer exists. So on any screen narrower than a laptop, pressing Extras
+ * blanked the entire editor. It stayed hidden for as long as it did because
+ * the only thing that could show the stage again was a switcher that is no
+ * longer drawn.
+ *
+ * The one rule worth keeping out of it: on a narrow screen the actions in the
+ * top bar are set a size down. */
 @media (max-width: 1080px) {
-  .e-body {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .e-left,
-  .e-stage,
-  .e-right {
-    display: none;
-    border: 0;
-  }
-  .e-body[data-pane="outline"] .e-left,
-  .e-body[data-pane="preview"] .e-stage,
-  .e-body[data-pane="inspector"] .e-right {
-    display: flex;
-  }
-  .e-stage-scroll {
-    padding: 16px;
-    justify-content: flex-start;
-  }
-
-  .e-panes {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    flex: none;
-    border-top: 1px solid var(--g-line);
-    background: var(--g-raise);
-    padding-bottom: env(safe-area-inset-bottom);
-  }
-  .e-pane {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 3px;
-    padding: 9px 4px;
-    border: 0;
-    background: transparent;
-    color: var(--g-ink-faint);
-    font: inherit;
-    font-size: 11px;
-    font-weight: 700;
-    cursor: pointer;
-  }
-  .e-pane[data-on="true"] {
-    color: var(--g-accent-ink);
-  }
-
   .e-topbar-actions .e-btn span,
   .e-topbar-actions .e-btn {
     font-size: 12px;

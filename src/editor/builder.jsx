@@ -33,6 +33,7 @@ import {
   IconDeviceDesktop,
   IconDeviceFloppy,
   IconDeviceMobile,
+  IconDots,
   IconDownload,
   IconFileText,
   IconMoodSmile,
@@ -50,6 +51,7 @@ import {
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { SiteNav } from "@/gator/site-nav";
+import { ThemeToggle } from "@/gator/theme-toggle";
 import { DiscordSurface } from "@/discord/surface";
 import { avatarUrl } from "@/lib/avatars";
 import { PHONE_HEIGHT, PHONE_WIDTH, blankProject, newAttachment, newGift, newMessage, newRole, newUser, reid, uid } from "@/lib/model";
@@ -79,6 +81,7 @@ import { Sheet } from "./sheet";
 import { floatingLayerOpen } from "./use-overlay";
 import "./editor.css";
 import "./composer.css";
+import "./phone.css";
 
 /* A hover label, with the shortcut where there is one. Every control that is
    an icon alone needs one — an icon is a guess until something names it — and
@@ -116,7 +119,6 @@ export function Builder({ user, canSignIn = true, shared = null }) {
   const [loaded, setLoaded] = useState(false);
   const [savedLocally, setSavedLocally] = useState(true);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [pane, setPane] = useState("preview");
   const [exporting, setExporting] = useState(false);
 
   const stage = useRef(null);
@@ -840,7 +842,6 @@ export function Builder({ user, canSignIn = true, shared = null }) {
     setSelected(next.id);
     setSheetOpen(null);
     setTab("Content");
-    setPane("inspector");
   }, [commit, message, project.messages, project.users]);
 
   const duplicateMessage = useCallback(() => {
@@ -1173,24 +1174,39 @@ export function Builder({ user, canSignIn = true, shared = null }) {
               <IconArrowForwardUp size={16} />
             </button>
           </Hint>
-          <Hint label="Start from a template">
-            <button
-              type="button"
-              className="e-btn e-btn-quiet"
-              onClick={() => setSheetOpen("templates")}
-            >
-              <IconStack2 size={15} /> Templates
-            </button>
-          </Hint>
-          <Hint label="Copy a link that carries the whole mockup">
-            <button
-              type="button"
-              className="e-btn e-btn-quiet"
-              onClick={doShare}
-            >
-              <IconShare2 size={15} /> Share
-            </button>
-          </Hint>
+          {/* Everything that is not why anybody opened the tool. On a phone
+              these step behind More: three word-buttons and an export do not
+              fit across 393 points, and the one that has to survive that is
+              the export. */}
+          <span className="e-nav-desk">
+            <Hint label="Start from a template">
+              <button
+                type="button"
+                className="e-btn e-btn-quiet"
+                onClick={() => setSheetOpen("templates")}
+              >
+                <IconStack2 size={15} /> Templates
+              </button>
+            </Hint>
+            <Hint label="Copy a link that carries the whole mockup">
+              <button
+                type="button"
+                className="e-btn e-btn-quiet"
+                onClick={doShare}
+              >
+                <IconShare2 size={15} /> Share
+              </button>
+            </Hint>
+          </span>
+          <button
+            type="button"
+            className="e-icon-btn e-nav-more"
+            onClick={() => setSheetOpen("more")}
+            aria-label="More"
+            title="More"
+          >
+            <IconDots size={18} />
+          </button>
           <Hint label={`Export a PNG at ${project.canvas.scale}×`}>
             <button
               type="button"
@@ -1208,7 +1224,7 @@ export function Builder({ user, canSignIn = true, shared = null }) {
           duplicated, deleted and edited on the canvas, and the two structures
           that need a real form — an embed and a container — get a panel that
           slides in beside it. */}
-      <div className="e-body" data-pane={pane}>
+      <div className="e-body">
         <main className="e-stage" data-dock={dockOpen && message ? "true" : "false"}>
           <div className="e-stage-bar e-no-export">
             {/* One control that said "Desktop · Ash" and opened a sheet holding
@@ -1444,6 +1460,14 @@ export function Builder({ user, canSignIn = true, shared = null }) {
             onAddAuthor={addUser}
             onSend={sendMessage}
             onAdd={addToMessage}
+            /* Undo and redo are in the top bar on a laptop and in the island's
+               own row on a phone, where the thumb is. Handed down rather than
+               duplicated: one history, one pair of buttons, two places they
+               can be drawn. */
+            onUndo={undo}
+            onRedo={redo}
+            canUndo={past.length > 0}
+            canRedo={future.length > 0}
             emojis={project.emojis}
             onTool={(id) => {
               /* Same rule as the buttons in the bar: with nothing selected
@@ -1458,8 +1482,7 @@ export function Builder({ user, canSignIn = true, shared = null }) {
                 setPanelOpen((open) => !(open && tab === id));
                 setTab(id);
               }
-              setPane("inspector");
-            }}
+                      }}
           />
 
           {/* ------------------------------------------------- editors */}
@@ -1684,6 +1707,87 @@ export function Builder({ user, canSignIn = true, shared = null }) {
           onError={fail}
           onNotify={notify}
         />
+      </Sheet>
+
+      {/* What the phone header could not hold.
+          Not a menu of everything — the actions that were on the bar, in the
+          order they were in, plus the two documents that used to sit in the
+          corner of the stage where the island now is. */}
+      <Sheet
+        open={sheetOpen === "more"}
+        onClose={() => setSheetOpen(null)}
+        title="More"
+        subtitle="Templates, sharing and the documents behind this tool"
+      >
+        <div className="e-more">
+          <button
+            type="button"
+            className="e-more-row"
+            onClick={() => setSheetOpen("templates")}
+          >
+            <IconStack2 size={18} />
+            <span>
+              <b>Templates</b>
+              <small>Start from a mockup that is already built</small>
+            </span>
+          </button>
+          <button
+            type="button"
+            className="e-more-row"
+            onClick={() => {
+              setSheetOpen(null);
+              doShare();
+            }}
+          >
+            <IconShare2 size={18} />
+            <span>
+              <b>Share a link</b>
+              <small>A link that carries the whole mockup</small>
+            </span>
+          </button>
+          <button
+            type="button"
+            className="e-more-row"
+            onClick={() => setSheetOpen("backups")}
+          >
+            <IconCloud size={18} />
+            <span>
+              <b>Backups</b>
+              <small>Saved copies, in this browser and in the cloud</small>
+            </span>
+          </button>
+          <button
+            type="button"
+            className="e-more-row"
+            onClick={() => setSheetOpen("appearance")}
+          >
+            <IconPalette size={18} />
+            <span>
+              <b>Appearance</b>
+              <small>Background, size, density and the client's notices</small>
+            </span>
+          </button>
+          {/* The site's own appearance, which is not the mockup's. It is in the
+              header on a laptop and there is no room for it on a phone, so it
+              is here — as itself, with a label, rather than as a moon nobody
+              can find. */}
+          <div className="e-more-theme">
+            <span>
+              <b>This tool's appearance</b>
+              <small>Light or dark, separate from the mockup's theme</small>
+            </span>
+            <ThemeToggle />
+          </div>
+          <nav className="e-more-legal" aria-label="About this tool">
+            <Link href="/terms">Terms</Link>
+            <span aria-hidden="true">·</span>
+            <Link href="/privacy">Privacy</Link>
+            <span aria-hidden="true">·</span>
+            <a href={SUPPORT_URL} target="_blank" rel="noreferrer">
+              Support
+            </a>
+          </nav>
+        </div>
       </Sheet>
 
       <Palette

@@ -184,7 +184,9 @@ export function SiteNav({ user, canSignIn = true, compact = false, links = true,
             <HoverTip label="Sign in with Discord to keep your mockups in the cloud" align="end">
               <a className="g-signin" href="/signin">
                 <IconBrandDiscord size={16} stroke={1.9} />
-                Sign in
+                {/* In a span so a narrow screen can drop the word and keep the
+                    mark: a bare text node has nothing to hide. */}
+                <span>Sign in</span>
               </a>
             </HoverTip>
           ) : (
@@ -197,7 +199,7 @@ export function SiteNav({ user, canSignIn = true, compact = false, links = true,
                   works without an account. */}
               <a className="g-signin" data-inert="true" href="/signin">
                 <IconBrandDiscord size={16} stroke={1.9} />
-                Sign in
+                <span>Sign in</span>
               </a>
             </HoverTip>
           )}

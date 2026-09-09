@@ -28,6 +28,11 @@ import { SPRING, createSpring, createTracker, prefersReducedMotion, project } fr
 
 export function useCanvasGestures({ scrollerRef, zoom, setZoom }) {
   const [dragging, setDragging] = useState(false);
+  /* The zoom as it is right now, for gestures that start from it. Read through
+     a ref so the touch listeners are bound once rather than rebound on every
+     frame of a pinch — which would tear down the very listener mid-gesture. */
+  const live = useRef(zoom);
+  live.current = zoom;
   const glide = useRef(null);
   const tracker = useRef(createTracker());
   const from = useRef(null);
@@ -242,6 +247,55 @@ export function useCanvasGestures({ scrollerRef, zoom, setZoom }) {
     node.addEventListener("wheel", onWheel, { passive: false });
     return () => node.removeEventListener("wheel", onWheel);
   }, [scrollerRef, setZoom]);
+
+  /* Two fingers, on a touch screen.
+   *
+   * The ⌘-wheel above is a trackpad pinch and nothing else: on a phone there
+   * was no way to zoom but the two small buttons on the bar, on the one device
+   * where pinching is the first thing anybody tries. This is the real gesture
+   * — the zoom tracks the spread of the fingers one to one, so the canvas is
+   * exactly as big as the hand has made it at every frame.
+   *
+   * Touch events rather than pointer events, because this needs to know about
+   * both fingers at once and `preventDefault` on the first frame is what stops
+   * the browser starting a two-finger scroll instead. One finger is left
+   * completely alone: that is the pan, and the scroller already does it. */
+  useEffect(() => {
+    const node = scrollerRef.current;
+    if (!node) return undefined;
+    const spread = (touches) =>
+      Math.hypot(
+        touches[0].clientX - touches[1].clientX,
+        touches[0].clientY - touches[1].clientY,
+      );
+    let pinch = null;
+    const onStart = (event) => {
+      if (event.touches.length !== 2) return;
+      stopGlide();
+      pinch = { from: spread(event.touches), zoom: live.current };
+      event.preventDefault();
+    };
+    const onMove = (event) => {
+      if (!pinch || event.touches.length !== 2) return;
+      event.preventDefault();
+      const now = spread(event.touches);
+      if (!pinch.from) return;
+      setZoom(Math.min(3, Math.max(0.25, pinch.zoom * (now / pinch.from))));
+    };
+    const onEnd = (event) => {
+      if (event.touches.length < 2) pinch = null;
+    };
+    node.addEventListener("touchstart", onStart, { passive: false });
+    node.addEventListener("touchmove", onMove, { passive: false });
+    node.addEventListener("touchend", onEnd);
+    node.addEventListener("touchcancel", onEnd);
+    return () => {
+      node.removeEventListener("touchstart", onStart);
+      node.removeEventListener("touchmove", onMove);
+      node.removeEventListener("touchend", onEnd);
+      node.removeEventListener("touchcancel", onEnd);
+    };
+  }, [scrollerRef, setZoom, stopGlide]);
 
   useEffect(() => () => stopGlide(), [stopGlide]);
 
