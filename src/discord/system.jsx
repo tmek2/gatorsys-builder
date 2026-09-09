@@ -222,7 +222,20 @@ export function FollowChannel({ text, edit }) {
 export function NoAccess({ reason = "You do not have permission to send messages in this channel.", edit }) {
   return (
     <div className="dc-no-access">
-      <Icon name="channel-rules" size={18} aria-hidden="true" />
+      {/* Drawn rather than taken from the icon library. The client puts a
+          crossed-out speech balloon here and there is no such tile — the one
+          that was being used was `channel-rules`, a clipboard with a tick,
+          which says the opposite of what this bar means. */}
+      <svg className="dc-no-access-mark" width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+        <path
+          d="M17 10c0 3.3-3.1 6-7 6a8 8 0 0 1-1.8-.2L4 17l1-2.8A5.6 5.6 0 0 1 3 10c0-3.3 3.1-6 7-6s7 2.7 7 6Z"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.6"
+          strokeLinejoin="round"
+        />
+        <path d="M4.8 15.2 15.6 4.4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+      </svg>
       <span>
         {edit ? (
           <InlineText

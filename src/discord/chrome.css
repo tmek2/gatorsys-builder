@@ -193,8 +193,10 @@
 .dc-sidebar-grip:active {
   cursor: grabbing;
 }
+/* Half-faded was from when the row stayed put and only a line moved. It is
+   carried with the pointer now, like a message, so it fades like one. */
 .dc-sidebar-channel[data-held="true"] {
-  opacity: 0.5;
+  opacity: 0.9;
 }
 .dc-sidebar-adds {
   display: flex;
@@ -694,6 +696,11 @@
 }
 
 /* A channel you can only read has no composer — it has a sentence saying so. */
+.dc-no-access-mark {
+  flex: none;
+  color: var(--text-muted);
+}
+
 .dc-no-access {
   display: flex;
   align-items: center;

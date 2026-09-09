@@ -85,6 +85,39 @@ const CHANNEL_KINDS = [
   { id: "rules", icon: "channel-rules", label: "Rules" },
 ];
 
+/* What kind the channel the mockup is *in* actually is.
+   One answer, read by the header, by the top of the channel and by the row in
+   the sidebar — there used to be a second setting for it, which is how the
+   sidebar could say "announcement" while the top of the channel drew a hash
+   and the header drew something else again. `channelKind` is still honoured
+   as a fallback so an older project keeps the kind it was saved with. */
+function channelKind(canvas) {
+  const here = (canvas.channels ?? [])
+    .map(asChannel)
+    .find((c) => c.name === (canvas.channel?.name || "general"));
+  return here?.kind ?? canvas.channelKind ?? "text";
+}
+
+/* Changing that kind, from wherever its glyph is drawn.
+   The channel list is the record — the header and the top of the channel both
+   read out of it — so a press on the header writes back into the list rather
+   than keeping a second answer beside it. A project old enough not to have the
+   channel in its list gets it added, and `channelKind` is kept in step for one
+   saved before the list carried types at all. */
+function cycleKind(canvas, edit) {
+  const name = canvas.channel?.name || "general";
+  const at = CHANNEL_KINDS.findIndex((k) => k.id === channelKind(canvas));
+  const kind = CHANNEL_KINDS[(at + 1) % CHANNEL_KINDS.length].id;
+  const list = (canvas.channels?.length ? canvas.channels : [name]).map(asChannel);
+  const next = list.some((c) => c.name === name)
+    ? list.map((c) => (c.name === name ? { ...c, kind } : c))
+    : [...list, { name, kind }];
+  edit.canvas({
+    channels: next.map((c) => ({ name: c.name, kind: c.kind, ...(c.category ? { category: c.category } : {}) })),
+    channelKind: kind,
+  });
+}
+
 /* Channels are stored as strings, which is all a mockup needed until it
    needed categories and types. Both shapes are accepted on the way in and only
    the object shape is written back, so an older project keeps working. */
@@ -93,7 +126,7 @@ function asChannel(entry) {
   return { name: entry?.name ?? "channel", kind: entry?.kind ?? "text", category: entry?.category };
 }
 
-function ChannelList({ canvas, edit, onMenu }) {
+function ChannelList({ canvas, edit, scrollers, onMenu }) {
   const raw = canvas.channels?.length ? canvas.channels : [canvas.channel?.name || "general"];
   const channels = raw.map(asChannel);
   const current = canvas.channel?.name || "general";
@@ -109,7 +142,13 @@ function ChannelList({ canvas, edit, onMenu }) {
       next.splice(to, 0, held);
       write(next);
     },
-    scrollers: [],
+    /* The same views a message drag creeps along. It had none, so holding a
+       channel against the top of a tall mockup sat there doing nothing while
+       the same hold on a message scrolled — one hook, two behaviours, which is
+       exactly what made this feel like a different, worse gesture. The list
+       itself never scrolls: it is drawn `overflow: hidden` because a mockup
+       with a scrollbar in it is a mockup of a scrollbar. */
+    scrollers,
   });
 
   /* Renaming the channel the mockup is *in* has to rename it everywhere: the
@@ -186,8 +225,11 @@ function ChannelList({ canvas, edit, onMenu }) {
             <div
               className={`dc-sidebar-channel${row.channel.name === current ? " dc-sidebar-on" : ""}`}
               data-row
-              data-held={order.drag?.from === row.at ? "true" : undefined}
               onContextMenu={onMenu ? (event) => onMenu(event, null, "channels") : undefined}
+              /* The same treatment a message gets: the row in hand is glued to
+                 the pointer and lifted over its neighbours. It had only the
+                 landing line, which is half a drag. */
+              {...order.rowProps(row.at)}
             >
               {edit ? (
                 <button
@@ -355,15 +397,31 @@ function ChannelHeader({ canvas, mobile, edit }) {
      type in the sidebar has to change it here too — the header and the row are
      the same channel, and having them disagree is the mockup contradicting
      itself in two places a screenshot shows at once. */
-  const here = (canvas.channels ?? []).map(asChannel).find((c) => c.name === (canvas.channel?.name || "general"));
-  const glyph =
-    CHANNEL_KINDS.find((k) => k.id === (here?.kind ?? canvas.channelKind ?? "text"))?.icon ?? "channel-text";
+  const kind = channelKind(canvas);
+  const glyph = CHANNEL_KINDS.find((k) => k.id === kind)?.icon ?? "channel-text";
+  /* And it is a control here too. It was one only in the sidebar, which meant
+     the one place a screenshot always shows the channel's type was the one
+     place you could not change it from. Not `e-no-export`: the glyph is part
+     of the picture, and this button has no chrome of its own to drop. */
+  const hash = edit ? (
+    <button
+      type="button"
+      className="dc-hash dc-hash-live"
+      title={`${CHANNEL_KINDS.find((k) => k.id === kind)?.label} channel — press to change`}
+      aria-label="Change the channel type"
+      onClick={() => cycleKind(canvas, edit)}
+    >
+      <Icon name={glyph} size={20} />
+    </button>
+  ) : (
+    <Icon name={glyph} size={20} className="dc-hash" />
+  );
 
   if (mobile) {
     return (
       <header className="dc-m-head">
         <Icon name="caret-left" size={22} className="dc-m-back" />
-        <Icon name={glyph} size={20} className="dc-hash" />
+        {hash}
         <span className="dc-m-head-name">
           {edit ? (
             <InlineText
@@ -387,7 +445,7 @@ function ChannelHeader({ canvas, mobile, edit }) {
   }
   return (
     <header className="dc-head">
-      <Icon name={glyph} size={20} className="dc-hash" />
+      {hash}
       <span className="dc-head-name">
         {edit ? (
           <InlineText
@@ -473,8 +531,6 @@ function MemberList({ canvas, users, roles = [], edit, scrollers, onMenu }) {
             seen += 1;
             const i = seen;
             const tint = roleColor(u, roles);
-            const held = order.drag?.from === i;
-            const landing = order.drag && order.drag.to === i && order.drag.from !== i;
             return (
               <Fragment key={u.id}>
               {order.lineAt === i ? <span className="dc-drop-line" aria-hidden="true" /> : null}
@@ -482,10 +538,8 @@ function MemberList({ canvas, users, roles = [], edit, scrollers, onMenu }) {
                 className="dc-member"
                 data-row
                 data-offline={u.status === "offline" ? "true" : undefined}
-                data-held={held ? "true" : undefined}
-                data-landing={landing ? "true" : undefined}
                 onContextMenu={onMenu ? (event) => onMenu(event, u.id, "member") : undefined}
-                {...(edit ? order.handlers(i, box) : {})}
+                {...order.rowProps(i)}
               >
                 <span className="dc-member-face">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -517,18 +571,36 @@ function MemberList({ canvas, users, roles = [], edit, scrollers, onMenu }) {
                 </span>
                 {u.bot ? <span className="dc-app-badge dc-app-badge-sm">{u.badge || "APP"}</span> : null}
                 {edit ? (
-                  <button
-                    type="button"
-                    className="dc-member-more e-no-export"
-                    title={`${u.name}'s roles and profile`}
-                    aria-label={`${u.name}'s roles and profile`}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      edit.member(u.id);
-                    }}
-                  >
-                    <Icon name="more-vertical" size={14} />
-                  </button>
+                  <span className="dc-member-tools e-no-export">
+                    {/* Dragged from a handle, not from anywhere on the row.
+                        Pressing a member and moving used to start a drag,
+                        which fought the click that opens them and made typing
+                        their name impossible. The same handle, in the same
+                        corner, that a channel and a message have — three
+                        lists, one gesture. */}
+                    <span
+                      className="dc-member-grip"
+                      role="button"
+                      tabIndex={-1}
+                      aria-label="Drag to reorder"
+                      title="Drag to reorder"
+                      {...order.handlers(i, box)}
+                    >
+                      <Icon name="more-vertical" size={13} />
+                    </span>
+                    <button
+                      type="button"
+                      className="dc-member-more"
+                      title={`${u.name}'s roles and profile`}
+                      aria-label={`${u.name}'s roles and profile`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        edit.member(u.id);
+                      }}
+                    >
+                      <Icon name="settings" size={14} />
+                    </button>
+                  </span>
                 ) : null}
               </div>
               </Fragment>
@@ -682,6 +754,10 @@ export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit, 
      only when that has nowhere left to go does the stage behind it move. */
   const conversation = useRef(null);
   const views = useMemo(() => [conversation, scroller].filter(Boolean), [scroller]);
+  /* The sidebars are not inside the conversation, so creeping *it* would
+     scroll the messages while the rows being dragged stayed put. Their edge
+     scroll is the stage, and only the stage. */
+  const stage = useMemo(() => [scroller].filter(Boolean), [scroller]);
   const order = useDragOrder({ onMove: (from, to) => edit?.reorder(from, to), scrollers: views });
 
   /* A chat is read from the bottom. Once the window has a height the
@@ -709,7 +785,7 @@ export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit, 
   const rows = (
     <div className="dc-stream" ref={stream} data-dragging={order.dragging ? "true" : "false"}>
       {canvas.showChannelStart ? (
-        <ChannelStart name={canvas.channel?.name || "general"} kind={canvas.channelKind} edit={edit} />
+        <ChannelStart name={canvas.channel?.name || "general"} kind={channelKind(canvas)} edit={edit} />
       ) : null}
       {canvas.showDateDivider ? <DateDivider label={canvas.dateLabel || "Today"} /> : null}
       {(project.messages ?? []).map((message, i) => (
@@ -776,7 +852,7 @@ export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit, 
         onContextMenu={edit ? (event) => openMenu(event, null) : undefined}
       >
         {canvas.chrome === "full" && !mobile ? <ServerRail canvas={canvas} edit={edit} /> : null}
-        {canvas.chrome === "full" && !mobile ? <ChannelList canvas={canvas} edit={edit} onMenu={edit ? openMenu : undefined} /> : null}
+        {canvas.chrome === "full" && !mobile ? <ChannelList canvas={canvas} edit={edit} scrollers={stage} onMenu={edit ? openMenu : undefined} /> : null}
 
         <div className="dc-main">
           {mobile && canvas.chrome !== "none" && canvas.showStatusBar !== false ? (
@@ -827,17 +903,23 @@ export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit, 
           {canvas.showTyping ? (
             <Typing names={canvas.typingNames || "Someone"} edit={edit} />
           ) : null}
-          {canvas.showFollow ? <FollowChannel text={canvas.followText} edit={edit} /> : null}
+          {/* One slot, and one of three things in it. The follow bar used to be
+              drawn *above* whatever else was there, so an announcement channel
+              you had not followed offered you Follow and a message box at the
+              same time — and turning on read-only as well stacked all three.
+              The client puts exactly one of them where you would type. */}
           {canvas.chrome !== "none" ? (
             canvas.readOnly ? (
               <NoAccess reason={canvas.readOnlyReason} edit={edit} />
+            ) : canvas.showFollow ? (
+              <FollowChannel text={canvas.followText} edit={edit} />
             ) : (
               <Composer canvas={canvas} mobile={mobile} />
             )
           ) : null}
         </div>
 
-        {canvas.chrome === "full" && !mobile ? <MemberList canvas={canvas} users={ctx.users} roles={project.roles ?? []} edit={edit} scrollers={views} onMenu={edit ? openMenu : undefined} /> : null}
+        {canvas.chrome === "full" && !mobile ? <MemberList canvas={canvas} users={ctx.users} roles={project.roles ?? []} edit={edit} scrollers={stage} onMenu={edit ? openMenu : undefined} /> : null}
       </div>
       {menu ? (
         <ContextMenu

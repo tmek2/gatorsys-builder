@@ -2606,12 +2606,25 @@
 .dc-member[data-landing="true"] {
   box-shadow: inset 2px 0 0 var(--g-accent, #f7a8c4);
 }
+/* The row's own controls, in the corner the channel rows keep theirs in:
+   quiet until the row is pointed at, and dropped from the export either way. */
+.dc-member-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 130ms ease;
+}
+.dc-member:hover .dc-member-tools,
+.dc-member:focus-within .dc-member-tools {
+  opacity: 1;
+}
 .dc-member-more {
-  display: none;
+  display: grid;
   place-items: center;
   width: 20px;
   height: 20px;
-  margin-left: auto;
   padding: 0;
   border: 0;
   border-radius: 4px;
@@ -2619,13 +2632,27 @@
   color: var(--text-muted);
   cursor: pointer;
 }
-.dc-member:hover .dc-member-more,
-.dc-member:focus-within .dc-member-more {
-  display: grid;
-}
 .dc-member-more:hover {
   background: var(--background-mod-strong);
   color: var(--text-default);
+}
+/* The handle. Same size, same glyph and same cursor as the one on a channel
+   row, because a member and a channel are dragged the same way. */
+.dc-member-grip {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 20px;
+  color: var(--text-muted);
+  cursor: grab;
+  touch-action: none;
+}
+.dc-member-grip:active {
+  cursor: grabbing;
+}
+/* The row in hand: lifted by the hook, faded here, exactly as a message is. */
+.dc-member[data-held="true"] {
+  opacity: 0.9;
 }
 .dc-members-add {
   display: flex;

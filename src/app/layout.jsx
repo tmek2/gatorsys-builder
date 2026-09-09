@@ -37,6 +37,10 @@ const inter = Inter({
   variable: "--font-discord",
 });
 
+/* Bumped whenever an icon file changes. See the note on `icons` below: this
+   is the only thing that gets a browser to let go of the one it cached. */
+const ICON_VERSION = "4";
+
 export const metadata = {
   metadataBase: new URL("https://mockups.gatorsys.xyz"),
   /* One name, everywhere. No per-route suffix: there is one route, and a tab
@@ -54,24 +58,29 @@ export const metadata = {
      ask for /favicon.ico anyway — including on an error page, where the
      document's own links may never render — and a 404 in the console is
      noise somebody has to rule out later.
-     
-     Every one of these is transparent, including the touch icon.
-     There was a dark plate behind the touch icon and the two PNGs, on the
-     theory that iOS composites a transparent home-screen icon onto black and
-     would look better with its own ground. Whatever the theory, the plate is
-     what kept appearing behind the logo in a browser tab — three separate
-     reports of "the tab has a black background" — because something in the
-     chain kept picking the plated file over the flat one. Nothing ships a
-     ground now, so nothing can draw one. */
+
+     Every one of these is transparent, and has been for three releases —
+     which was not enough, because "the tab has a black background" was
+     reported after every one of them. The plate had gone from the files and
+     stayed in the browser: a favicon is cached against its own URL, in a
+     store that a reload, a hard reload and an empty HTTP cache all leave
+     alone, so the black one kept being drawn from disk no matter what the
+     server sent. The version below is how you evict it. A new URL is a new
+     icon as far as that store is concerned, so the old bitmap can never be
+     chosen again. Bump it if the artwork ever changes.
+
+     The .ico now actually holds the five sizes it claims. It held one 16px
+     image and said it had five, so every ask for a 32 — which is what a tab
+     wants on a scaled Windows display — got a 16 stretched to fit. */
   icons: {
     icon: [
-      { url: "/favicon.svg", type: "image/svg+xml" },
-      { url: "/favicon.ico", sizes: "16x16 24x24 32x32 48x48 64x64" },
+      { url: `/favicon.svg?v=${ICON_VERSION}`, type: "image/svg+xml" },
+      { url: `/favicon.ico?v=${ICON_VERSION}`, sizes: "16x16 24x24 32x32 48x48 64x64" },
     ],
-    shortcut: "/favicon.ico",
-    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    shortcut: `/favicon.ico?v=${ICON_VERSION}`,
+    apple: [{ url: `/apple-touch-icon.png?v=${ICON_VERSION}`, sizes: "180x180", type: "image/png" }],
   },
-  manifest: "/manifest.webmanifest",
+  manifest: `/manifest.webmanifest?v=${ICON_VERSION}`,
 };
 
 export const viewport = {

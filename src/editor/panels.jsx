@@ -531,31 +531,42 @@ export function CanvasPanel({ project, commit, onError }) {
           value={canvas.showChannelStart}
           onChange={(v) => set("showChannelStart", v)}
         />
-        {canvas.showChannelStart ? (
-          <Field label="Channel kind">
-            <Segmented
-              value={canvas.channelKind || "text"}
-              onChange={(v) => set("channelKind", v)}
-              label="Channel kind"
-              options={[
-                { value: "text", label: "Text" },
-                { value: "announcement", label: "Announcement" },
-              ]}
-            />
-          </Field>
-        ) : null}
-        <Toggle
-          label="Follow this channel"
-          hint="The card an announcement channel puts above the composer."
-          value={canvas.showFollow}
-          onChange={(v) => set("showFollow", v)}
-        />
-        <Toggle
-          label="Read-only channel"
-          hint="Replaces the composer with the client's own line about not being able to post."
-          value={canvas.readOnly}
-          onChange={(v) => set("readOnly", v)}
-        />
+        {/* The channel's kind is the channel's, set on its row in the list
+            beside the mockup. There used to be a second control for it here,
+            which is how the sidebar could say "announcement" while the top of
+            the channel drew a hash. */}
+
+        {/* One slot, one of three things in it. Follow and read-only were two
+            switches that could both be on, and the mockup then drew a follow
+            bar, a read-only bar *and* a message box stacked on top of each
+            other — three states of the same slot, all at once. */}
+        <Field
+          label="At the bottom"
+          hint="What the client puts where you would type. An announcement channel you have not followed offers Follow instead of a message box; one you cannot post in says so."
+        >
+          <Segmented
+            label="At the bottom"
+            value={canvas.readOnly ? "readonly" : canvas.showFollow ? "follow" : "composer"}
+            onChange={(v) =>
+              commit(
+                (p) => ({
+                  ...p,
+                  canvas: {
+                    ...p.canvas,
+                    readOnly: v === "readonly",
+                    showFollow: v === "follow",
+                  },
+                }),
+                "canvas:footer",
+              )
+            }
+            options={[
+              { value: "composer", label: "Message box" },
+              { value: "follow", label: "Follow" },
+              { value: "readonly", label: "No permission" },
+            ]}
+          />
+        </Field>
         {canvas.readOnly ? (
           <Field label="What it says">
             <Text value={canvas.readOnlyReason} onChange={(v) => set("readOnlyReason", v)} />
