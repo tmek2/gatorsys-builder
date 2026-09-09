@@ -37,8 +37,9 @@ const inter = Inter({
   variable: "--font-discord",
 });
 
-/* Bumped whenever an icon file changes. See the note on `icons` below: this
-   is the only thing that gets a browser to let go of the one it cached. */
+/* Bumped whenever an icon or the link-preview card changes. See the note on
+   `icons` below: this is the only thing that gets a browser — or a crawler —
+   to let go of the one it has already cached. */
 const ICON_VERSION = "5";
 
 export const metadata = {
@@ -47,12 +48,36 @@ export const metadata = {
      reading "Builder — Gator Mockups" says the same thing twice. */
   title: SITE_NAME,
   description: SITE_DESCRIPTION,
+  /* What a shared link shows.
+   *
+   * A link to this used to arrive as a bare URL with a line of text under it,
+   * which for a tool whose whole output is a picture is the worst possible
+   * introduction. The card is the product's own materials — the wordmark, the
+   * ground, and a phone with a real conversation on it drawn by the same
+   * renderer the tool exports — and it is built by `scripts/build-og.mjs`
+   * rather than drawn by hand, so it can be made again when any of that
+   * changes. Versioned like the icons, because a crawler caches this against
+   * its URL exactly the same way. */
   openGraph: {
     title: SITE_NAME,
     description: SITE_DESCRIPTION,
     url: "https://mockups.gatorsys.xyz",
     siteName: SITE_NAME,
     type: "website",
+    images: [
+      {
+        url: `/og.png?v=${ICON_VERSION}`,
+        width: 1200,
+        height: 630,
+        alt: "Gator Mockups — a Discord conversation on an iPhone, built in the editor",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    images: [`/og.png?v=${ICON_VERSION}`],
   },
   /* The SVG is the one browsers should use; the .ico is there because they
      ask for /favicon.ico anyway — including on an error page, where the
