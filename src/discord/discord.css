@@ -983,8 +983,17 @@
   position: relative;
   margin: 0;
   overflow: hidden;
+  /* A picture that has not loaded — a link that 404s, a slot still empty — has
+     no size, and a cell with no size cannot be hovered. Which means the
+     controls that would fix the broken link are unreachable precisely when
+     they are needed. Only while editing: the export must not gain a grey
+     rectangle where a picture failed. */
   border-radius: 4px;
   background: var(--background-base-lower);
+}
+.dc-gallery-cell:has(> .dc-imgtools) {
+  min-width: 110px;
+  min-height: 78px;
 }
 .dc-gallery-cell img,
 .dc-gallery-cell video {
@@ -1496,7 +1505,6 @@
   align-items: center;
   gap: 8px;
   min-height: 24px;
-  margin-top: -4px;
   padding: 2px 16px 4px;
   color: var(--text-default);
   font-size: 0.875rem;

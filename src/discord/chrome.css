@@ -480,13 +480,23 @@
 .dc-mobile .dc-embed-grid {
   grid-template-columns: minmax(0, 1fr);
 }
+/* The slot is what the grid places now, so it is what has to move — a child
+   still asking for column 2 makes an implicit second track, and the embed goes
+   back to being two columns wide on a 393px phone. */
+.dc-mobile .dc-embed-thumb-slot {
+  grid-column: 1;
+  grid-row: auto;
+  width: 100%;
+  height: auto;
+  margin-top: 12px;
+}
 .dc-mobile .dc-embed-thumb {
   grid-column: 1;
   grid-row: auto;
   width: 100%;
   height: auto;
   max-height: 240px;
-  margin-top: 12px;
+  margin-top: 0;
   object-fit: cover;
 }
 .dc-mobile .dc-embed-image {

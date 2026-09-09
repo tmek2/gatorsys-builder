@@ -472,6 +472,23 @@ export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit, 
   const views = useMemo(() => [conversation, scroller].filter(Boolean), [scroller]);
   const order = useDragOrder({ onMove: (from, to) => edit?.reorder(from, to), scrollers: views });
 
+  /* A chat is read from the bottom. Once the window has a height the
+     conversation scrolls inside it, and the client always sits on the newest
+     message — so a mockup that opened at the top showed the oldest ones and
+     framed the wrong part of itself for the export.
+     Only when a message arrives, though. Somebody who scrolled up to frame a
+     particular exchange has said where they want to be, and yanking them back
+     to the bottom would take that away. */
+  const grown = useRef(0);
+  useEffect(() => {
+    const view = conversation.current;
+    const count = project.messages?.length ?? 0;
+    if (!view) return;
+    if (count >= grown.current) view.scrollTop = view.scrollHeight;
+    grown.current = count;
+  }, [project.messages, canvas.height, canvas.chrome, canvas.platform]);
+
+
   const byId = useMemo(
     () => new Map((project.messages ?? []).map((m) => [m.id, m])),
     [project.messages],
