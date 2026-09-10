@@ -40,7 +40,6 @@ const say = async (text) => {
   await page.keyboard.press("Enter");
   await page.waitForTimeout(350);
 };
-await say("Ship it 🎉");
 
 /* The phone, with the client's full chrome and the device frame around it.
  *
@@ -58,9 +57,52 @@ await page.getByRole("option", { name: "Window", exact: true }).click();
 await page.waitForTimeout(700);
 await page.locator(".e-stage-seg", { hasText: "Phone" }).first().click();
 await page.waitForTimeout(700);
-/* Two voices, because one person talking to themselves for six lines is not
-   what a Discord screenshot looks like.
-   Deselect first: the author picker reassigns the message that is selected,
+/* A second person, because the conversation needs two of them and the blank
+   project has one person and one app.
+ *
+ * It used to run the exchange between the human and Gator, which wears the
+ * APP tag — so the picture showed a bot answering "took about a minute" like
+ * somebody chatting, which no app does and which was fairly reported as
+ * wrong. The app keeps the one line an app would actually post, the welcome,
+ * and the two people have the conversation. */
+const addPerson = async (name) => {
+  await page.mouse.click(60, 400);
+  await page.waitForTimeout(300);
+  /* The canvas's own menu: right-clicking the plate rather than a message is
+     how the editor offers the things that belong to the mockup as a whole. */
+  await page.mouse.click(160, 620, { button: "right" });
+  await page.waitForTimeout(400);
+  await page.getByRole("menuitem", { name: /add a member/i }).click();
+  await page.waitForTimeout(700);
+  /* The *open* group's name field, not the first one on the sheet.
+     Every member's fields are in the DOM whether their group is open or not,
+     so "the first Name field" is the first member's — which is how the app
+     ended up renamed to the person who was supposed to be new, keeping its
+     APP tag and its lines. The sheet opens on the one just made, and that is
+     the one standing open. */
+  const field = page
+    .locator('.e-sheet .e-group[data-open="true"]')
+    .locator(".e-field", { hasText: "Name" })
+    .first()
+    .locator("input");
+  await field.fill(name);
+  await page.waitForTimeout(300);
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(500);
+
+  /* And prove it took, because a rename that silently lands on the wrong
+     member is exactly the failure this picture had. */
+  await page.locator(".c-author-btn").click();
+  await page.waitForTimeout(350);
+  const listed = await page.locator(".c-author-option").allInnerTexts();
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  const people = listed.map((t) => t.split("\n")[0].trim());
+  if (!people.includes(name)) throw new Error(`no member called ${name}: ${people.join(", ")}`);
+  if (!people.includes("Gator")) throw new Error(`the app was renamed: ${people.join(", ")}`);
+};
+
+/* Deselect first: the author picker reassigns the message that is selected,
    so switching with the last one still highlighted moves *that* message to
    the new person instead of the next one. */
 const sendAs = async (name) => {
@@ -71,19 +113,32 @@ const sendAs = async (name) => {
   await page.locator(".c-author-option", { hasText: name }).first().click();
   await page.waitForTimeout(400);
 };
+
+await addPerson("Rhea");
 await sendAs("Member");
 await say("how did you get a screenshot of a message that doesn't exist");
-await sendAs("Gator");
+await sendAs("Rhea");
 await say("gator mockups — took about a minute");
 await sendAs("Member");
 await say("even the roles and the colours?");
-await sendAs("Gator");
+await sendAs("Rhea");
 await say("all of it. drag things around and export the picture");
 
 /* Nothing selected: the editor's highlight on the last message is the editor
    talking about itself, and this picture is about the output. */
 await page.mouse.click(60, 400);
 await page.waitForTimeout(600);
+
+/* The device's lift comes off before it is photographed.
+ *
+ * A shadow spreads outside the element, and an element screenshot is clipped
+ * to the element's own box — so the part of the shadow that falls inside the
+ * box survives and the rest is cut, which paints the four corners outside the
+ * body's radius as flat dark squares. Composited onto the card, those read as
+ * hard edges down the phone's sides where the background's own texture stops.
+ * Without the shadow the corners are simply transparent. */
+await page.addStyleTag({ content: ".e-frame, .e-frame-phone { box-shadow: none !important; }" });
+await page.waitForTimeout(200);
 
 const mockup = await page.locator(".e-frame").screenshot({ type: "png", omitBackground: true });
 const mockupUrl = `data:image/png;base64,${mockup.toString("base64")}`;

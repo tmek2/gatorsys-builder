@@ -704,6 +704,15 @@
    content laid out inside them, which is how a message box ended up with its
    corner cut off. */
 .e-frame-phone {
+  /* The one place on this page that is not border-box.
+   *
+   * The width handed to this element is the iPhone's viewport — 393 — and the
+   * panel says so. Under the page's own `border-box` the nine points of bezel
+   * came out of that, leaving a 375-point screen: an iPhone SE wearing a 15's
+   * label, with every message laid out eighteen points narrower than the
+   * client it is imitating. Here the border goes outside the number, which is
+   * what a bezel does on a real phone. */
+  box-sizing: content-box;
   border: 9px solid #0c0c0e;
   border-radius: 64px !important;
   box-shadow: var(--mac-lift-high), 0 0 0 1px rgba(255, 255, 255, 0.08);

@@ -102,20 +102,21 @@ async function fetched(url) {
   }
 }
 
-/* The screen's own corner radius on the phone.
+/* The phone's outer corner radius.
  *
- * The device frame is 54px at the outside with an 8px bezel, so the glass
- * inside it is 46. The export rasterises the surface rather than the frame, so
- * without this the phone came out as a square-cornered rectangle while the
- * desktop kept its rounding — which is not what either client looks like. */
-const PHONE_SCREEN_RADIUS = 46;
+ * The whole device is what gets rasterised now — the bezel and the body's own
+ * corners are part of what a phone mockup is, and exporting the screen alone
+ * handed back a rounded rectangle of chat with no phone around it. So this is
+ * the body's radius, matching the frame the editor draws, rather than the
+ * glass radius inside it. */
+const PHONE_BODY_RADIUS = 64;
 
 /* How the mockup is rasterised, in one place, because the still export and the
    animated one have to agree about it exactly — a GIF whose frames are framed
    differently from the PNG is two bugs, not one feature. */
 function options(project, { scale } = {}) {
   const canvas = project.canvas ?? {};
-  const radius = canvas.platform === "mobile" ? PHONE_SCREEN_RADIUS : (canvas.radius ?? 0);
+  const radius = canvas.platform === "mobile" ? PHONE_BODY_RADIUS : (canvas.radius ?? 0);
   return {
     pixelRatio: scale ?? canvas.scale ?? 2,
     cacheBust: false,

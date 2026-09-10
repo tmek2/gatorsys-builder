@@ -133,6 +133,10 @@ export function Builder({ user, canSignIn = true, shared = null }) {
   const [gifProgress, setGifProgress] = useState(null);
 
   const stage = useRef(null);
+  /* The device around the screen. The phone's bezel and its outer corners are
+     drawn by the editor's frame rather than by the surface inside it, so a
+     phone export has to rasterise this and a desktop one the surface. */
+  const frame = useRef(null);
   const importer = useRef(null);
   const scroller = useRef(null);
   const [room, setRoom] = useState(0);
@@ -991,11 +995,17 @@ export function Builder({ user, canSignIn = true, shared = null }) {
 
   /* ------------------------------------------------------------ actions */
 
+  /* A phone is exported as a phone: the bezel and the rounded body are part of
+     the picture, and a screen with nothing around it is the thing the mockup
+     was drawn to avoid. The desktop window has no such frame — its own chrome
+     is inside the surface — so it exports the surface. */
+  const exportNode = () => (project.canvas.platform === "mobile" ? frame.current : stage.current);
+
   const doExportPng = useCallback(async () => {
-    if (!stage.current) return;
+    if (!exportNode()) return;
     setExporting(true);
     try {
-      await exportPng(stage.current, project);
+      await exportPng(exportNode(), project);
       notify("PNG exported.");
     } catch {
       fail(
@@ -1011,11 +1021,11 @@ export function Builder({ user, canSignIn = true, shared = null }) {
   const animated = useMemo(() => hasAnimation(project), [project]);
 
   const doExportGif = useCallback(async () => {
-    if (!stage.current) return;
+    if (!exportNode()) return;
     setExporting(true);
     setGifProgress(0);
     try {
-      const result = await exportGif(stage.current, project, setGifProgress);
+      const result = await exportGif(exportNode(), project, setGifProgress);
       if (result?.error) fail(result.error);
       else notify("GIF exported.");
     } catch {
@@ -1477,6 +1487,7 @@ export function Builder({ user, canSignIn = true, shared = null }) {
           >
             <div className="e-stage-pad">
               <div
+                ref={frame}
                 className={`e-frame${phone ? " e-frame-phone" : ""}`}
                 style={{
                   /* The phone is a device, not a narrow canvas: its width is the

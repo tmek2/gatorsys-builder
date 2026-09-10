@@ -376,20 +376,22 @@ function PhoneSignal({ canvas, edit }) {
   const bars = canvas.phoneSignal ?? 4;
   const label = bars ? `${bars} of 4 bars` : "No service";
   const glyph = (
-    /* Measured off Apple's own status-bar artwork rather than eyeballed: four
-       bars 3.25 wide on a 5.33 pitch, sitting on one baseline, rising 4.5, 7.2,
-       9.8, 12.4 in a box 13 tall. The whole ladder is 19.25 wide. */
-    <svg width="19.25" height="13" viewBox="0 0 19.25 13" aria-hidden="true">
+    /* Four bars 3.1 wide on a 4.85 pitch, sitting on one baseline, rising 4.2,
+       6.8, 9.4 and 12 in a box 12 tall.
+       Tighter than it was, and less rounded: at rx 1 on a bar 4.5 tall the
+       shortest rung was more corner than bar and read as a dot next to three
+       rectangles. */
+    <svg width="17.65" height="12" viewBox="0 0 17.65 12" aria-hidden="true">
       {[0, 1, 2, 3].map((i) => {
-        const tall = 4.5 + i * 2.65;
+        const tall = 4.2 + i * 2.6;
         return (
           <rect
             key={i}
-            x={i * 5.33}
-            y={12.5 - tall}
-            width="3.25"
+            x={i * 4.85}
+            y={12 - tall}
+            width="3.1"
             height={tall}
-            rx="1"
+            rx="0.75"
             fill="currentColor"
             /* A bar you do not have is drawn, not faded away: the phone leaves
                the whole ladder in place and greys the rungs above the signal. */
@@ -429,28 +431,36 @@ function PhoneWifi({ canvas, edit }) {
      twelve pixels it came out as a smear that read as nothing at all. Two arcs
      and a dot are the same mark and they are drawable. */
   const glyph = (
-    /* Also measured: 17 wide by 13 tall, a dot of radius 2, and two bands
-       about 2.4 thick struck on radii of 4.5 and 9.4 around it. Everything
-       before this was a guess at the curvature and it showed — the arcs came
-       out either flat or thin, and the mark stopped reading as wi-fi. */
-    <svg width="17" height="13" viewBox="0 0 17 13" fill="none" aria-hidden="true">
+    /* Struck about one point, which the last version was not.
+     *
+     * Its two arcs and its dot each had their own centre — 8.5, 7.75 and 8.75
+     * — so the bands did not sit inside one another and the mark came out
+     * leaning, which is what "distorted" meant. Everything here is a 90° arc
+     * about (8, 10.3), the same point the dot is drawn at: radius 4 and radius
+     * 7.2, endpoints at 45° either side of straight up, so
+     * 0.7071 x r off centre in both axes.
+     *
+     * The strokes are thinner than they were as well. At 2.4 in a box 12 tall
+     * the two bands nearly touched, and two arcs with no daylight between them
+     * read as one solid fan. */
+    <svg width="16" height="12" viewBox="0 0 16 12" fill="none" aria-hidden="true">
       <path
-        d="M1.4 4.6a9.4 9.4 0 0 1 14.2 0"
+        d="M2.91 5.21A7.2 7.2 0 0 1 13.09 5.21"
         stroke="currentColor"
-        strokeWidth="2.4"
+        strokeWidth="1.9"
         strokeLinecap="round"
         opacity={level >= 3 ? 1 : 0.32}
       />
       <path
-        d="M4 7.9a4.5 4.5 0 0 1 7.5 0"
+        d="M5.17 7.47A4 4 0 0 1 10.83 7.47"
         stroke="currentColor"
-        strokeWidth="2.4"
+        strokeWidth="1.9"
         strokeLinecap="round"
         opacity={level >= 2 ? 1 : 0.32}
       />
-      <circle cx="8.75" cy="10.9" r="2.05" fill="currentColor" opacity={level >= 1 ? 1 : 0.32} />
+      <circle cx="8" cy="10.3" r="1.5" fill="currentColor" opacity={level >= 1 ? 1 : 0.32} />
       {level === 0 ? (
-        <path d="M2.2 12.4 14.8 1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        <path d="M2.4 11.4 13.6 1.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
       ) : null}
     </svg>
   );
@@ -915,15 +925,16 @@ function Composer({ canvas, mobile }) {
       <Icon name="attach" size={22} className="dc-composer-plus" />
       <span className="dc-composer-text">Message #{canvas.channel?.name || "general"}</span>
       <span className="dc-composer-tools">
-        {/* The phone does not get the desktop's row shrunk down. It has its
-            own set — emoji, then the camera, the gallery and the microphone,
-            which are the three things a phone can offer that a desktop
-            cannot. */}
+        {/* The phone's own three, and they are the client's rather than a
+            guess at what a phone would offer: gift, emoji, microphone. It had
+            emoji, a camera, a gallery and a microphone — four buttons, two of
+            which the app does not draw, reported as "these are the options on
+            the chat bar for phones, not yours". The camera and the gallery
+            live behind the plus. */}
         {mobile ? (
           <>
+            <Icon name="gift" size={20} />
             <Icon name="emoji" size={20} />
-            <Icon name="camera" size={20} />
-            <Icon name="gallery" size={20} />
             <Icon name="microphone" size={20} />
           </>
         ) : (
