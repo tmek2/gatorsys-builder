@@ -31,7 +31,7 @@ import { Blob, useBlob } from "@/gator/blob";
 import { Icon } from "@/discord/icon";
 import { Hint } from "./fields";
 import { EmojiInsert } from "./emoji-picker";
-import { fitWithin } from "@/lib/image";
+import { fitWithin, inlineRemote } from "@/lib/image";
 import { projectImages } from "@/lib/model";
 import { ALL_EMOJI } from "@/lib/emoji-data";
 import { twemojiUrl } from "@/discord/emoji";
@@ -191,6 +191,21 @@ function MediaPick({ icon, label, hint, what, kind, accept, size = 20, project, 
     setTerm("");
   };
 
+  /* A picture that lives on somebody else's server — a KLIPY GIF, a pasted
+     link — is fetched and kept rather than linked. A linked one taints the
+     canvas the export rasterises through, and the export fails: a GIF picker
+     whose GIFs cannot be exported is not a GIF picker. The popover closes on
+     the press rather than waiting for the bytes, so picking still feels like
+     picking; the picture arrives a moment later. */
+  const chooseRemote = async (src) => {
+    setBusy(true);
+    try {
+      choose(await inlineRemote(src));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   /* One way in for a file, whether it was chosen, dropped or pasted. */
   const take = async (chosen) => {
     if (!chosen) return;
@@ -312,7 +327,7 @@ function MediaPick({ icon, label, hint, what, kind, accept, size = 20, project, 
                   /* Refused rather than drawn: a javascript: or data:text/html
                      source in a mockup is somebody else's script inside it. */
                   if (safeMedia(link)) {
-                    choose(link);
+                    chooseRemote(link);
                     setLink("");
                   }
                 }}
@@ -387,7 +402,7 @@ function MediaPick({ icon, label, hint, what, kind, accept, size = 20, project, 
                             style={{ aspectRatio: gif.ratio || 1 }}
                             title={gif.label}
                             aria-label={gif.label}
-                            onClick={() => choose(gif.src)}
+                            onClick={() => chooseRemote(gif.src)}
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={gif.preview} alt="" loading="lazy" />

@@ -16,7 +16,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "./icon";
-import { fitWithin } from "@/lib/image";
+import { fitWithin, savePicture } from "@/lib/image";
 import { safeMedia } from "@/lib/urls";
 
 /**
@@ -94,6 +94,26 @@ export function ImageTools({ value, onChange, onRemove, label = "image", align =
         onClick={() => file.current?.click()}
       >
         <Icon name="upload" size={14} />
+      </button>
+
+      {/* Saving the picture back out. A GIF picked from the picker is in the
+          mockup and nowhere else, and wanting the file itself — to send it on,
+          to keep it — is a fair thing to want from the tool that fetched it. */}
+      <button
+        type="button"
+        title={`Save this ${label}`}
+        aria-label={`Save this ${label}`}
+        disabled={busy || !value}
+        onClick={async () => {
+          setBusy(true);
+          try {
+            await savePicture(value, label);
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        <Icon name="download" size={14} />
       </button>
 
       <button

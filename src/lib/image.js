@@ -150,3 +150,106 @@ export async function fitWithin(file, max = MEDIA_SIZE) {
     return raw;
   }
 }
+
+
+/* Bringing a picture that lives somewhere else into the mockup.
+ *
+ * A linked picture is a picture the browser did not fetch itself, and one of
+ * those cannot be read back out of a canvas — it taints it, and the export
+ * that rasterises the mockup through a canvas fails outright. That is the
+ * whole of "the export failed. An image linked from another site can block
+ * it", and it is not something to tell somebody who has just picked a GIF out
+ * of the GIF picker.
+ *
+ * So a picked or pasted link is fetched through this deployment's own route
+ * and kept as its own bytes. The mockup then exports, and it also survives the
+ * link rotting, which a mockup made of other people's URLs does not.
+ *
+ * Falls back to the URL it was given. A linked picture that draws is worth
+ * more than no picture at all, and the export's own message already says what
+ * to do about it.
+ */
+export async function inlineRemote(url, { max = MEDIA_SIZE } = {}) {
+  if (typeof url !== "string" || !/^https:\/\//i.test(url)) return url;
+  try {
+    const response = await fetch(`/api/media?url=${encodeURIComponent(url)}`);
+    if (!response.ok) return url;
+    const blob = await response.blob();
+    if (!blob.size) return url;
+    const file = new File([blob], "picture", { type: blob.type });
+    /* An animation is kept whole — `fitWithin` hands those back untouched —
+       and a still photograph off somebody's CDN is scaled the same way an
+       uploaded one is rather than carried at full size in the project. */
+    return await fitWithin(file, max);
+  } catch {
+    return url;
+  }
+}
+
+
+/* Saving a picture out of the mockup.
+ *
+ * The other direction from every other function here. A GIF picked from KLIPY
+ * or dropped in is in the project and nowhere else, and wanting the file back
+ * — to send it somewhere, to keep it — is a fair thing to want from a tool
+ * that took it.
+ *
+ * A cross-origin `href` makes the browser ignore the `download` attribute
+ * entirely and navigate to the picture instead, so anything still linked is
+ * fetched through this deployment's route first. That makes it same-origin,
+ * which is the whole of what the attribute needs.
+ */
+const EXTENSION = {
+  "image/gif": "gif",
+  "image/webp": "webp",
+  "image/png": "png",
+  "image/jpeg": "jpg",
+  "image/avif": "avif",
+  "image/svg+xml": "svg",
+  "video/mp4": "mp4",
+  "video/webm": "webm",
+};
+
+/* A data URI unpacked into a blob, without `fetch`.
+ *
+ * `fetch` would be the one-liner, but this app's `connect-src` is `self` and a
+ * fetch to a `data:` URL counts as a connection — so it is refused, and every
+ * picture the mockup holds is one of these. Reading bytes the page already has
+ * in a string is not worth widening a policy for. */
+export function blobFromDataUrl(uri) {
+  const comma = uri.indexOf(",");
+  if (comma < 0 || typeof atob !== "function") return null;
+  try {
+    const head = uri.slice(5, comma);
+    const type = head.split(";")[0] || "application/octet-stream";
+    const body = uri.slice(comma + 1);
+    const text = /;base64/i.test(head) ? atob(body) : decodeURIComponent(body);
+    return new Blob([Uint8Array.from(text, (c) => c.charCodeAt(0))], { type });
+  } catch {
+    return null;
+  }
+}
+
+export async function savePicture(src, name = "picture") {
+  if (typeof src !== "string" || !src) return false;
+  try {
+    let blob = /^data:/i.test(src) ? blobFromDataUrl(src) : null;
+    if (!blob) {
+      const url = /^https:\/\//i.test(src) ? `/api/media?url=${encodeURIComponent(src)}` : src;
+      const response = await fetch(url);
+      if (!response.ok) return false;
+      blob = await response.blob();
+    }
+    if (!blob?.size) return false;
+
+    const object = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = object;
+    link.download = `${name}.${EXTENSION[blob.type] ?? "png"}`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(object), 1000);
+    return true;
+  } catch {
+    return false;
+  }
+}

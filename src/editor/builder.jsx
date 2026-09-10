@@ -36,6 +36,7 @@ import {
   IconDots,
   IconDownload,
   IconFileText,
+  IconGif,
   IconMoodSmile,
   IconPalette,
   IconPhotoDown,
@@ -66,9 +67,11 @@ import { Inspector, TABS } from "./inspector";
 import { CanvasPanel, EmojiPanel, UsersPanel } from "./panels";
 import { BackupsPanel } from "./backups-panel";
 import {
+  exportGif,
   exportMessageJson,
   exportPng,
   exportProject,
+  hasAnimation,
   messageJson,
   readShareLink,
   shareLink,
@@ -123,6 +126,10 @@ export function Builder({ user, canSignIn = true, shared = null }) {
   const [savedLocally, setSavedLocally] = useState(true);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  /* How far the animated export has got, 0 to 1, or null when none is
+     running. A GIF is one raster per frame and takes seconds rather than
+     milliseconds, so it says so rather than looking hung. */
+  const [gifProgress, setGifProgress] = useState(null);
 
   const stage = useRef(null);
   const importer = useRef(null);
@@ -597,6 +604,7 @@ export function Builder({ user, canSignIn = true, shared = null }) {
             { id: "templates", label: "Start from a template\u2026", icon: "copy-text", run: () => setSheetOpen("templates") },
             "-",
             { id: "png", label: "Export a PNG", icon: "download", run: () => doExportPng() },
+            { id: "gif", label: "Export an animated GIF", icon: "gif", run: () => doExportGif() },
           ];
         }
         const at = project.messages.findIndex((m) => m.id === id);
@@ -997,6 +1005,26 @@ export function Builder({ user, canSignIn = true, shared = null }) {
     }
   }, [fail, notify, project]);
 
+  /* Cheap enough to run on every edit; the real decode happens only when the
+     button is pressed. */
+  const animated = useMemo(() => hasAnimation(project), [project]);
+
+  const doExportGif = useCallback(async () => {
+    if (!stage.current) return;
+    setExporting(true);
+    setGifProgress(0);
+    try {
+      const result = await exportGif(stage.current, project, setGifProgress);
+      if (result?.error) fail(result.error);
+      else notify("GIF exported.");
+    } catch {
+      fail("The GIF export failed. Try it as a picture instead.");
+    } finally {
+      setGifProgress(null);
+      setExporting(false);
+    }
+  }, [fail, notify, project]);
+
   const doShare = useCallback(async () => {
     const { url, kind, error } = await shareLink(project);
     if (error) {
@@ -1242,6 +1270,22 @@ export function Builder({ user, canSignIn = true, shared = null }) {
           >
             <IconDots size={18} />
           </button>
+          {/* Only when there is something to animate. An export button that
+              tells you there was nothing to export is a button that should not
+              have been drawn. */}
+          {animated ? (
+            <Hint label="Export the animation as a GIF">
+              <button
+                type="button"
+                className="e-btn e-btn-quiet"
+                onClick={doExportGif}
+                disabled={exporting}
+              >
+                <IconGif size={15} />{" "}
+                {gifProgress === null ? "GIF" : `${Math.round(gifProgress * 100)}%`}
+              </button>
+            </Hint>
+          ) : null}
           <Hint label={`Export a PNG at ${project.canvas.scale}×`}>
             <button
               type="button"
@@ -1784,6 +1828,23 @@ export function Builder({ user, canSignIn = true, shared = null }) {
               <small>A link that carries the whole mockup</small>
             </span>
           </button>
+          {animated ? (
+            <button
+              type="button"
+              className="e-more-row"
+              disabled={exporting}
+              onClick={() => {
+                setSheetOpen(null);
+                doExportGif();
+              }}
+            >
+              <IconGif size={18} />
+              <span>
+                <b>Export an animated GIF</b>
+                <small>Keeps the animation moving instead of freezing it</small>
+              </span>
+            </button>
+          ) : null}
           <button
             type="button"
             className="e-more-row"
@@ -1837,6 +1898,7 @@ export function Builder({ user, canSignIn = true, shared = null }) {
           { label: "Duplicate this message", run: duplicateMessage },
           { label: "Delete this message", run: removeMessage },
           { label: "Export a PNG", run: doExportPng },
+          { label: "Export an animated GIF", run: doExportGif },
           { label: "Copy a share link", run: doShare },
           { label: "Copy the message JSON", run: copyJson },
           {

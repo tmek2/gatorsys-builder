@@ -30,9 +30,75 @@ export async function exportPng(node, project) {
      for the duration. */
   node.setAttribute("data-exporting", "true");
   try {
-    return await raster(toPng, node, project);
+    return await withLocalPictures(node, async () => {
+      const url = await toPng(node, options(project));
+      download(url, `${safeName(project.name)}.png`);
+    });
   } finally {
     node.removeAttribute("data-exporting");
+  }
+}
+
+/* Every picture in the mockup, fetched, for the length of one export.
+ *
+ * A picture the browser loaded from somebody else's server taints the canvas
+ * the raster goes through, and a tainted canvas cannot be read back — so one
+ * linked image failed the whole export, with a message telling you to upload
+ * it instead. That is a fair thing to say about a picture you pasted a link
+ * to and a useless thing to say about a GIF you picked out of the GIF picker.
+ *
+ * The picker brings its own pictures in now, so this is the safety net: a
+ * mockup that arrived from a share link, an imported payload full of CDN
+ * URLs, a link typed into a field. Each one is fetched through this
+ * deployment's route, which makes it same-origin, swapped in for the length
+ * of the raster and put back afterwards. What is stored does not change.
+ *
+ * Anything that cannot be fetched is left as it was: it may well be a picture
+ * that would have exported fine, and failing early over it would be the bug
+ * this exists to fix.
+ */
+async function withLocalPictures(node, run) {
+  const remote = [...node.querySelectorAll("img, video")].filter((el) =>
+    /^https?:\/\//i.test(el.getAttribute("src") ?? ""),
+  );
+
+  const swapped = [];
+  await Promise.all(
+    remote.map(async (el) => {
+      const was = el.getAttribute("src");
+      const now = await fetched(was);
+      if (!now) return;
+      swapped.push([el, was]);
+      el.setAttribute("src", now);
+    }),
+  );
+
+  /* Drawn before it is rasterised. An `<img>` whose source changed a
+     millisecond ago has nothing to paint yet, and html-to-image would
+     photograph the gap. */
+  await Promise.all(swapped.map(([el]) => el.decode?.().catch(() => {})));
+
+  try {
+    return await run();
+  } finally {
+    for (const [el, was] of swapped) el.setAttribute("src", was);
+  }
+}
+
+async function fetched(url) {
+  try {
+    const response = await fetch(`/api/media?url=${encodeURIComponent(url)}`);
+    if (!response.ok) return null;
+    const blob = await response.blob();
+    if (!blob.size) return null;
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
   }
 }
 
@@ -44,12 +110,14 @@ export async function exportPng(node, project) {
  * desktop kept its rounding — which is not what either client looks like. */
 const PHONE_SCREEN_RADIUS = 46;
 
-async function raster(toPng, node, project) {
+/* How the mockup is rasterised, in one place, because the still export and the
+   animated one have to agree about it exactly — a GIF whose frames are framed
+   differently from the PNG is two bugs, not one feature. */
+function options(project, { scale } = {}) {
   const canvas = project.canvas ?? {};
   const radius = canvas.platform === "mobile" ? PHONE_SCREEN_RADIUS : (canvas.radius ?? 0);
-
-  const url = await toPng(node, {
-    pixelRatio: canvas.scale ?? 2,
+  return {
+    pixelRatio: scale ?? canvas.scale ?? 2,
     cacheBust: false,
     // The stage applies a zoom transform for the editor's own benefit; the
     // export is of the message, not of how far it happens to be zoomed.
@@ -63,8 +131,207 @@ async function raster(toPng, node, project) {
       overflow: "hidden",
     },
     filter: (el) => !el.classList?.contains("e-no-export"),
-  });
-  download(url, `${safeName(project.name)}.png`);
+  };
+}
+
+/* The mockup as an animation.
+ *
+ * A GIF in a mockup is the reason the GIF picker exists, and a PNG export
+ * throws it away — you get the first frame of the joke. This exports what is
+ * actually on the screen.
+ *
+ * The shape of it: every animation in the mockup is read apart into its
+ * frames, a common timeline is laid over all of them, and at each step every
+ * animated picture is set to the frame it would be showing at that moment and
+ * the whole mockup is rasterised. The browser does the layout, the clipping
+ * and the rounding on every frame, so an animated export is framed exactly
+ * like the still one rather than approximately like it.
+ *
+ * Costs: one raster per frame, which is the expensive part, so the timeline is
+ * sampled rather than followed exactly — 20 frames a second, capped — and the
+ * caller is handed progress to show, because a silent ten seconds reads as a
+ * hang.
+ */
+
+/* Twenty frames a second: smooth enough that nobody counts them, and two
+   thirds of the rasters that following a 30fps source exactly would cost. */
+const STEP_MS = 50;
+const MAX_STEPS = 100;
+
+/* Whether the mockup looks as though it has an animation in it.
+ *
+ * This decides whether to *offer* the GIF export, so it runs on every edit and
+ * has to be cheap: it walks the project for strings that could be a picture
+ * and stops at the first one that moves, rather than serialising a project
+ * that may be several megabytes of inlined images. `findAnimations` is the
+ * real answer, and it is paid for once, when the button is actually pressed.
+ *
+ * The webp case is why this is not a regular expression over the text. Every
+ * still photograph uploaded here is re-encoded as webp, so "it is a webp" says
+ * nothing — the animation flag in the file's own header is what says it, and
+ * that is four bytes in. Getting this wrong would put a GIF button on almost
+ * every mockup and then tell whoever pressed it that nothing moves. */
+const GIF_URL = /\.gif(\?|#|$)/i;
+
+/* A webp says whether it animates in the extended-format chunk: "VP8X" twelve
+   bytes in, and bit 1 of the flags byte after its length. A still webp has no
+   VP8X chunk at all. */
+function webpAnimates(uri) {
+  const comma = uri.indexOf(",");
+  if (comma < 0 || typeof atob !== "function") return false;
+  try {
+    const head = atob(uri.slice(comma + 1, comma + 61));
+    if (head.slice(0, 4) !== "RIFF" || head.slice(8, 12) !== "WEBP") return false;
+    if (head.slice(12, 16) !== "VP8X") return false;
+    return (head.charCodeAt(20) & 0x02) !== 0;
+  } catch {
+    return false;
+  }
+}
+
+function looksAnimated(value) {
+  if (typeof value !== "string" || value.length < 16) return false;
+  if (value.startsWith("data:image/gif")) return true;
+  if (value.startsWith("data:image/webp")) return webpAnimates(value);
+  if (value.startsWith("data:")) return false;
+  return /^https?:/i.test(value) && GIF_URL.test(value);
+}
+
+export function hasAnimation(project) {
+  const seen = new Set();
+  const walk = (value) => {
+    if (looksAnimated(value)) return true;
+    if (Array.isArray(value)) return value.some(walk);
+    if (value && typeof value === "object") {
+      /* A project is a tree, but a shared reference would otherwise be walked
+         twice and a cycle would not come back at all. */
+      if (seen.has(value)) return false;
+      seen.add(value);
+      return Object.values(value).some(walk);
+    }
+    return false;
+  };
+  return walk(project);
+}
+
+/** Whether there is anything in this node worth exporting as an animation. */
+export async function findAnimations(node) {
+  const { decodeAnimation } = await import("./animate");
+  const pictures = [...node.querySelectorAll("img")].filter(
+    (el) => !el.closest(".e-no-export"),
+  );
+  const found = [];
+  for (const el of pictures) {
+    const animation = await decodeAnimation(el.currentSrc || el.src);
+    if (animation) found.push({ el, animation });
+  }
+  return found;
+}
+
+/**
+ * Export the mockup as an animated GIF.
+ *
+ * @param report called with a number from 0 to 1 as the frames are drawn.
+ * @returns `{ error }` when there was nothing to animate, nothing otherwise.
+ */
+export async function exportGif(node, project, report = () => {}) {
+  const [{ toCanvas }, { GIFEncoder, quantize, applyPalette }, { bitmapToUrl, frameAt }] =
+    await Promise.all([import("html-to-image"), import("gifenc"), import("./animate")]);
+  await document.fonts.ready;
+
+  node.setAttribute("data-exporting", "true");
+  try {
+    return await withLocalPictures(node, async () => {
+      const moving = await findAnimations(node);
+      if (!moving.length) {
+        return { error: "Nothing in this mockup moves. Export it as a picture instead." };
+      }
+
+      /* The loop is as long as the longest animation, so a mockup with a
+         two-second GIF and a one-second one plays the short one twice rather
+         than cutting the long one in half. */
+      const span = Math.max(...moving.map((m) => m.animation.duration));
+      const steps = Math.min(MAX_STEPS, Math.max(2, Math.round(span / STEP_MS)));
+      const delay = Math.round(span / steps);
+
+      /* Each source frame is turned into something an `<img>` will take once,
+         here, rather than once per step: the same frame is shown at several
+         steps and encoding it again each time is the whole cost of the export
+         paid twice. */
+      const stills = moving.map(() => new Map());
+
+      /* What each picture was showing before any of this. The export drives
+         them frame by frame through their own `src`, and without putting them
+         back the mockup is left frozen on whichever frame the last step
+         happened to be — a still picture where the animation was. */
+      const was = moving.map(({ el }) => el.getAttribute("src"));
+
+      const encoder = GIFEncoder();
+      let size = null;
+
+      try {
+        for (let step = 0; step < steps; step += 1) {
+          const at = step * delay;
+
+          await Promise.all(
+            moving.map(async ({ el, animation }, i) => {
+              const frame = frameAt(animation, at);
+              let url = stills[i].get(frame);
+              if (!url) {
+                url = bitmapToUrl(frame.bitmap);
+                stills[i].set(frame, url);
+              }
+              if (el.getAttribute("src") === url) return;
+              el.setAttribute("src", url);
+              await el.decode?.().catch(() => {});
+            }),
+          );
+
+          const canvas = await toCanvas(node, options(project, { scale: gifScale(project) }));
+          const ctx = canvas.getContext("2d", { willReadFrequently: true });
+          const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          /* Every frame the same size, because a GIF has one canvas and a raster
+             that came back a pixel taller would shear the rest of the file. */
+          size ??= { width, height };
+          if (width !== size.width || height !== size.height) continue;
+
+          /* A palette per frame rather than one for the file: a mockup is flat
+             colour and small text over a photograph, and a shared 256 colours
+             spends most of them on the photograph and posterises the text. */
+          const palette = quantize(data, 256, { format: "rgb444" });
+          encoder.writeFrame(applyPalette(data, palette, "rgb444"), width, height, {
+            palette,
+            delay,
+            transparent: false,
+          });
+
+          report((step + 1) / steps);
+        }
+      } finally {
+        moving.forEach(({ el }, i) => {
+          if (was[i] === null) el.removeAttribute("src");
+          else el.setAttribute("src", was[i]);
+        });
+      }
+
+      encoder.finish();
+      const blob = new Blob([encoder.bytesView()], { type: "image/gif" });
+      const url = URL.createObjectURL(blob);
+      download(url, `${safeName(project.name)}.gif`);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      return {};
+    });
+  } finally {
+    node.removeAttribute("data-exporting");
+  }
+}
+
+/* A GIF is 256 colours a frame and a hundred frames, so it grows with the
+   square of the scale in a way a PNG does not. Two times a 1200px mockup is a
+   file nobody can send; one is the honest default and a mockup already drawn
+   small keeps the scale it was given. */
+function gifScale(project) {
+  return Math.min(project.canvas?.scale ?? 2, 1.5);
 }
 
 export function exportProject(project) {
