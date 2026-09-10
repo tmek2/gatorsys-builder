@@ -834,9 +834,10 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  /* Seven, which is what the spacing measures between the ladder, the fan and
-     the battery in Apple's artwork. */
-  gap: 7px;
+  /* Six between the ladder and the fan, seven between the fan and the battery,
+     which is what the artwork measures — the marks are not evenly spaced and
+     one gap for both put the fan a pixel out of place. */
+  gap: 6px;
   padding-right: 22px;
 }
 
@@ -879,6 +880,13 @@
   outline: 2px solid var(--g-accent, #f7a8c4);
   outline-offset: 2px;
 }
+/* The seventh point of the fan-to-battery gap. The flex gap above carries six,
+   which is the ladder-to-fan measurement; the artwork puts one more here. */
+.dc-m-status-right .dc-m-battery-live,
+.dc-m-status-right > .dc-m-battery {
+  margin-left: 1px;
+}
+
 .dc-m-battery-live {
   /* Along its length is the level; a press is the state. */
   cursor: ew-resize;
@@ -902,7 +910,8 @@
   /* The shell keeps the bar's own colour whatever the battery is doing — iOS
      tints the fill, never the outline. */
   border: 1px solid color-mix(in srgb, var(--text-strong) 38%, transparent);
-  border-radius: 5px;
+  /* Four, off the artwork: at five the ends were rounder than Apple's. */
+  border-radius: 4px;
   color: var(--dc-battery, currentColor);
 }
 /* The number, over the shell's whole inside so that a clip at the fill's own
@@ -954,13 +963,15 @@
   transform: translate(-50%, -50%);
 }
 /* The nub on the end, which is the half that makes it read as a battery. */
+/* The nub: one and a half points wide by four tall, one clear of the shell,
+   which is what it measures in the artwork. */
 .dc-m-battery::after {
   content: "";
   position: absolute;
   top: 50%;
-  right: -3.3px;
-  width: 1.3px;
-  height: 3.7px;
+  right: -2.4px;
+  width: 1.2px;
+  height: 3.4px;
   border-radius: 0 1px 1px 0;
   background: color-mix(in srgb, var(--text-strong) 45%, transparent);
   transform: translateY(-50%);

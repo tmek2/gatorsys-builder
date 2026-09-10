@@ -376,22 +376,26 @@ function PhoneSignal({ canvas, edit }) {
   const bars = canvas.phoneSignal ?? 4;
   const label = bars ? `${bars} of 4 bars` : "No service";
   const glyph = (
-    /* Four bars 3.1 wide on a 4.85 pitch, sitting on one baseline, rising 4.2,
-       6.8, 9.4 and 12 in a box 12 tall.
-       Tighter than it was, and less rounded: at rx 1 on a bar 4.5 tall the
-       shortest rung was more corner than bar and read as a dot next to three
-       rectangles. */
-    <svg width="17.65" height="12" viewBox="0 0 17.65 12" aria-hidden="true">
+    /* Read off Apple's own artwork rather than drawn by eye.
+     *
+     * The community status-bar file's "Levels" layer is the three marks at 1x,
+     * and every number here is a pixel measurement of it: four bars 4 wide on
+     * a 5.33 pitch, one baseline, rising 5, 7.67, 10.33 and 13 in a box 13
+     * tall, 20 across. Every version of this before was a guess at those
+     * numbers, and each guess came out a different size from the mark beside
+     * it — which is what "what is this sizing" meant. All three marks are 13
+     * tall now because in the artwork all three are. */
+    <svg width="20" height="13" viewBox="0 0 20 13" aria-hidden="true">
       {[0, 1, 2, 3].map((i) => {
-        const tall = 4.2 + i * 2.6;
+        const tall = 5 + (i * 8) / 3;
         return (
           <rect
             key={i}
-            x={i * 4.85}
-            y={12 - tall}
-            width="3.1"
+            x={(i * 16) / 3}
+            y={13 - tall}
+            width="4"
             height={tall}
-            rx="0.75"
+            rx="1"
             fill="currentColor"
             /* A bar you do not have is drawn, not faded away: the phone leaves
                the whole ladder in place and greys the rungs above the signal. */
@@ -431,36 +435,34 @@ function PhoneWifi({ canvas, edit }) {
      twelve pixels it came out as a smear that read as nothing at all. Two arcs
      and a dot are the same mark and they are drawable. */
   const glyph = (
-    /* Struck about one point, which the last version was not.
+    /* Measured off the same artwork, the same way.
      *
-     * Its two arcs and its dot each had their own centre — 8.5, 7.75 and 8.75
-     * — so the bands did not sit inside one another and the mark came out
-     * leaning, which is what "distorted" meant. Everything here is a 90° arc
-     * about (8, 10.3), the same point the dot is drawn at: radius 4 and radius
-     * 7.2, endpoints at 45° either side of straight up, so
-     * 0.7071 x r off centre in both axes.
-     *
-     * The strokes are thinner than they were as well. At 2.4 in a box 12 tall
-     * the two bands nearly touched, and two arcs with no daylight between them
-     * read as one solid fan. */
-    <svg width="16" height="12" viewBox="0 0 16 12" fill="none" aria-hidden="true">
+     * 17 by 13, everything struck about (8.5, 10.4) — the dot's own centre —
+     * and spanning fifty degrees either side of straight up: a dot of radius
+     * 2, an arc on radius 4.4 struck 2 thick, and an arc on radius 9.1
+     * struck 2.4. Reading those off the file settled two things guessing had
+     * got wrong. The outer band is far larger than the 7.2 drawn here before,
+     * so the mark had been coming out small beside the ladder and the battery;
+     * and the span is fifty degrees rather than forty-five, which is why the
+     * limbs reach the edges of the box the way the artwork's do. */
+    <svg width="17" height="13" viewBox="0 0 17 13" fill="none" aria-hidden="true">
       <path
-        d="M2.91 5.21A7.2 7.2 0 0 1 13.09 5.21"
+        d="M1.53 4.65A9.1 9.1 0 0 1 15.47 4.65"
         stroke="currentColor"
-        strokeWidth="1.9"
+        strokeWidth="2.4"
         strokeLinecap="round"
         opacity={level >= 3 ? 1 : 0.32}
       />
       <path
-        d="M5.17 7.47A4 4 0 0 1 10.83 7.47"
+        d="M5.13 7.67A4.4 4.4 0 0 1 11.87 7.67"
         stroke="currentColor"
-        strokeWidth="1.9"
+        strokeWidth="2"
         strokeLinecap="round"
         opacity={level >= 2 ? 1 : 0.32}
       />
-      <circle cx="8" cy="10.3" r="1.5" fill="currentColor" opacity={level >= 1 ? 1 : 0.32} />
+      <circle cx="8.5" cy="10.5" r="2" fill="currentColor" opacity={level >= 1 ? 1 : 0.32} />
       {level === 0 ? (
-        <path d="M2.4 11.4 13.6 1.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M2.2 12.2 14.8 1.2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
       ) : null}
     </svg>
   );

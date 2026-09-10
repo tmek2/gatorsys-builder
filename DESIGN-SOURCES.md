@@ -176,3 +176,35 @@ The 240 default avatars in `public/avatars` are drawn from the collection
 supplied with the project, at their original 45px artwork bounds. They are
 files rather than base64 inlined into a module, so the browser fetches only the
 ones it draws and the picker can lazy-load.
+
+## The iPhone status bar, measured rather than drawn
+
+Source: `iOS_and_iPadOS_27_Community_Status_Bars_and_Menu_Bars.psd`, the file
+in this conversation's uploads. Its `Status bar - iPhone / Dark / Levels /
+Frame` layer is the three trailing marks at 1x — 85 x 13 — and every number
+below is a pixel measurement of that layer, taken with `psd-tools` and a row
+profile rather than by eye.
+
+This section exists because these three marks were redrawn from guesswork four
+times, and each guess came out a different size from the mark beside it. If
+they need touching again, measure the layer again; do not adjust by eye.
+
+    from psd_tools import PSDImage
+    layer = ...  # Dark/Levels/Frame
+    layer.composite().save("levels.png")   # 85 x 13, white on transparent
+
+**All three marks are 13 tall.** That is the single fact every previous version
+got wrong.
+
+| mark | box | detail |
+| --- | --- | --- |
+| signal | 20 x 13 | 4 bars, each 4 wide, 5.33 pitch, one baseline, heights 5 / 7.67 / 10.33 / 13, corner radius 1 |
+| wi-fi | 17 x 13 | everything struck about (8.5, 10.5), spanning 50 degrees either side of straight up: dot r 2, arc on r 4.4 struck 2 thick, arc on r 9.1 struck 2.4 |
+| battery | 25 x 13 | corner radius 4; nub 1.2 x 3.4, one clear of the shell |
+
+Gaps between them: 6 from the ladder to the fan, 7 from the fan to the battery.
+They are not evenly spaced, and one flex gap for both puts the fan a pixel out.
+
+The iPhone's other measurements from the same file: the time is 34 x 13 at 17px
+600 weight, the Dynamic Island is 125 x 37, and the status bar is 54 tall with
+the marks 22 in from the trailing edge.
