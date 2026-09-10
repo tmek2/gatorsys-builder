@@ -17,6 +17,7 @@
 import { Markdown, MarkdownInline, formatTime } from "./markdown";
 import { safeMedia, safeUrl } from "@/lib/urls";
 import { ImageDrop, ImageTools } from "./image-tools";
+import { Ghost } from "./ghost";
 
 /* How wide one field sits, in twelfths.
  *
@@ -82,12 +83,7 @@ export function Embed({ embed, set }) {
     <div className="dc-embed" style={{ borderLeftColor: embed.color || "#5865f2" }}>
       <div className={`dc-embed-grid${hasSide ? " dc-embed-has-thumb" : ""}`}>
         <div className="dc-embed-main">
-          {bare ? (
-            <div className="dc-embed-ghost e-no-export" aria-hidden="true">
-              <span className="dc-embed-ghost-line" data-line="title" />
-              <span className="dc-embed-ghost-line" data-line="body" />
-            </div>
-          ) : null}
+          {bare ? <Ghost lines={["title", "body"]} /> : null}
 
           {embed.provider ? <div className="dc-embed-provider">{embed.provider}</div> : null}
 

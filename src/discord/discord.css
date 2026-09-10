@@ -725,19 +725,19 @@ ol.dc-list {
   font-size: 0.875rem;
   font-weight: 600;
 }
-/* The empty embed: the shape of the text rather than the text.
+/* Empty: the shape of the text rather than the text.
  *
  * Two bars, sized like the title line and the first line of the description,
  * so a freshly added embed reads as "this is where the words go" instead of
  * as the words "Embed title" waiting to be deleted. Editor only — it carries
  * `e-no-export`, so nothing of it reaches a picture. */
-.dc-embed-ghost {
+.dc-ghost {
   display: flex;
   flex-direction: column;
   gap: 9px;
   padding: 2px 0 4px;
 }
-.dc-embed-ghost-line {
+.dc-ghost-line {
   display: block;
   border-radius: 4px;
   /* Two of the client's own washes, one painted over the other, so the bar
@@ -746,14 +746,20 @@ ol.dc-list {
   background-color: var(--background-mod-normal);
   background-image: linear-gradient(var(--background-mod-subtle), var(--background-mod-subtle));
 }
-.dc-embed-ghost-line[data-line="title"] {
+.dc-ghost-line[data-line="title"] {
   width: 38%;
   min-width: 96px;
   height: 16px;
 }
-.dc-embed-ghost-line[data-line="body"] {
+.dc-ghost-line[data-line="body"] {
   width: 62%;
   min-width: 150px;
+  height: 14px;
+}
+/* The second line of a paragraph, which is never as long as the first. */
+.dc-ghost-line[data-line="short"] {
+  width: 44%;
+  min-width: 110px;
   height: 14px;
 }
 

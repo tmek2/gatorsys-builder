@@ -17,6 +17,9 @@ import { Markdown } from "./markdown";
 import { Icon } from "./icon";
 import { Emoji } from "./emoji-node";
 import { FileCard, GalleryGrid } from "./media";
+import { useContext } from "react";
+import { RenderContext } from "./context";
+import { Ghost } from "./ghost";
 
 /* Discord's five button styles plus the premium one, which is the only button
  * whose label the client draws itself. */
@@ -94,10 +97,15 @@ function Select({ block }) {
  * thumbnail, or a single button. */
 function Section({ block }) {
   const accessory = block.accessory ?? {};
+  const { edit } = useContext(RenderContext);
   return (
     <div className="dc-section">
       <div className="dc-section-text">
-        <Markdown text={block.content || ""} jumbo={false} />
+        {edit && !block.content ? (
+          <Ghost lines={["body", "short"]} />
+        ) : (
+          <Markdown text={block.content || ""} jumbo={false} />
+        )}
       </div>
       {accessory.kind === "button" ? (
         <div className="dc-section-accessory">
@@ -145,12 +153,23 @@ function Container({ block }) {
   );
 }
 
-const RENDERERS = {
-  text: ({ block }) => (
+/* A text block with nothing in it.
+ *
+ * It drew nothing at all, so a container holding one looked like a container
+ * with a bug in it — the block was in the panel, listed as "Empty", and the
+ * canvas showed a gap. The embed already drew grey bars when it was empty;
+ * this is the same thing, for the same reason, in the other layout. */
+function TextDisplay({ block }) {
+  const { edit } = useContext(RenderContext);
+  return (
     <div className="dc-text-display">
-      <Markdown text={block.content || ""} />
+      {edit && !block.content ? <Ghost lines={["body", "short"]} /> : <Markdown text={block.content || ""} />}
     </div>
-  ),
+  );
+}
+
+const RENDERERS = {
+  text: TextDisplay,
   section: Section,
   gallery: ({ block }) => <GalleryGrid items={block.items ?? []} />,
   separator: Separator,
