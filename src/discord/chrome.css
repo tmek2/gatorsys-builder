@@ -945,8 +945,11 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 7px;
-  height: 10px;
+  /* Small. It was ten points tall inside a thirteen-point shell, so it stood
+     over the top and bottom edges and out past the fill — a battery with a
+     bolt through it rather than a charging battery. */
+  width: 4.6px;
+  height: 7px;
   color: var(--text-strong);
   transform: translate(-50%, -50%);
 }

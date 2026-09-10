@@ -724,6 +724,10 @@ export function Builder({ user, canSignIn = true, shared = null }) {
     });
     commit((p) => ({ ...p, users: [...p.users, made] }));
     setSendAs(made.id);
+    /* Open on the one that was just made. Without this the sheet falls back to
+       "whoever is first", so pressing Add a member put you in front of a member
+       you already had — and the new one was somewhere down the list. */
+    setFocusUser(made.id);
     setSheetOpen("members");
   }, [commit, project.users.length]);
 

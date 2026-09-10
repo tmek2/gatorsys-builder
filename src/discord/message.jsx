@@ -294,6 +294,12 @@ function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, 
       onKeyDown={
         onSelect
           ? (event) => {
+              /* Only when the row itself has the keyboard.
+                 Without this line the row answered every key pressed inside
+                 it, and its answer to Space was `preventDefault` — so a space
+                 typed into the author's name, or into the words of the
+                 message, never arrived. "John Smith" came out "JohnSmith". */
+              if (event.target !== event.currentTarget) return;
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
                 onSelect(event);
@@ -402,6 +408,7 @@ function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, 
                   edit.avatar(user?.id);
                 }}
                 onKeyDown={(event) => {
+                  if (event.target !== event.currentTarget) return;
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
                     event.stopPropagation();
@@ -435,6 +442,7 @@ function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, 
                     setStamping((v) => !v);
                   }}
                   onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) return;
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
                       event.stopPropagation();
