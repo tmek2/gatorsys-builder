@@ -20,8 +20,8 @@
 import React, { useRef, useState } from "react";
 import {
   IconChevronDown,
+  IconChevronUp,
   IconCopy,
-  IconGripVertical,
   IconPlus,
   IconTrash,
 } from "@tabler/icons-react";
@@ -488,9 +488,17 @@ function BlockRow({ block, onPatch, onRemove, onDuplicate, onMove, first, last, 
         <span className="e-block-tools">
           {/* Up and down rather than drag: the tree nests, and a drag that can
               cross a container boundary needs a drop model that says what
-              happens at every edge. Two buttons cannot be ambiguous. */}
+              happens at every edge. Two buttons cannot be ambiguous.
+              They are arrows now. They were one button carrying a six-dot
+              grip — the glyph every interface uses for "pick this up and drag
+              it" — which did not drag, did the job of the arrow below it, and
+              on a block that is the only one in its list did nothing at all.
+              Reported, fairly, as useless. */}
           <button type="button" className="e-icon-btn" disabled={first} onClick={() => onMove(-1)} aria-label="Move up">
-            <IconGripVertical size={14} style={{ transform: "rotate(90deg)" }} />
+            <IconChevronUp size={15} />
+          </button>
+          <button type="button" className="e-icon-btn" disabled={last} onClick={() => onMove(1)} aria-label="Move down">
+            <IconChevronDown size={15} />
           </button>
           <button type="button" className="e-icon-btn" onClick={onDuplicate} aria-label="Duplicate">
             <IconCopy size={14} />
@@ -503,17 +511,11 @@ function BlockRow({ block, onPatch, onRemove, onDuplicate, onMove, first, last, 
 
       {open && Body ? (
         <div className="e-block-body">
+          {/* The pair of word-buttons that used to sit under every open block
+              said the same thing as the two arrows in its header, one line
+              apart, and only appeared while the block was open — so a
+              collapsed block could not be moved at all. The arrows do it. */}
           <Body block={block} patch={onPatch} onError={onError} depth={depth} />
-          {!first || !last ? (
-            <div className="e-block-move">
-              <button type="button" className="e-btn e-btn-quiet" disabled={first} onClick={() => onMove(-1)}>
-                Move up
-              </button>
-              <button type="button" className="e-btn e-btn-quiet" disabled={last} onClick={() => onMove(1)}>
-                Move down
-              </button>
-            </div>
-          ) : null}
         </div>
       ) : null}
     </div>

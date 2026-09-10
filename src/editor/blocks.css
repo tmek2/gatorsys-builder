@@ -78,13 +78,6 @@
   gap: 12px;
   padding: 12px 10px;
 }
-.e-block-move {
-  display: flex;
-  gap: 6px;
-}
-.e-block-move .e-btn {
-  flex: 1;
-}
 
 /* A nested list is inset and hairlined on the left, so the depth is legible
    without counting indents. */

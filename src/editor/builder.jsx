@@ -93,6 +93,8 @@ import "./phone.css";
    an icon alone needs one — an icon is a guess until something names it — and
    the shortcut belongs here rather than in a help page nobody opens. */
 const STORE_KEY = "project";
+/* A width in this browser, not a fact about the mockup. */
+const PANEL_WIDTH_KEY = "gm:panel-width";
 const SLUG_KEY = "slug";
 /* Which saved backup this working copy belongs to, if any. See the backups
    panel: a linked mockup is one where "Save" means "update that backup"
@@ -133,6 +135,40 @@ export function Builder({ user, canSignIn = true, shared = null }) {
      running. A GIF is one raster per frame and takes seconds rather than
      milliseconds, so it says so rather than looking hung. */
   const [gifProgress, setGifProgress] = useState(null);
+
+  /* How wide the editor panel is, in pixels, or null for the default.
+   *
+   * A container with four text blocks in it is a column of paragraphs read
+   * through a 420-point slot, and the panel had no way to be anything else.
+   * The width is dragged from its leading edge and kept in this browser: it is
+   * a preference about a screen, not part of the mockup, so it does not belong
+   * in the project and must not travel in a share link. */
+  const [panelWidth, setPanelWidth] = useState(null);
+  useEffect(() => {
+    try {
+      const kept = Number(window.localStorage.getItem(PANEL_WIDTH_KEY));
+      if (Number.isFinite(kept) && kept > 0) setPanelWidth(kept);
+    } catch {
+      /* A browser with storage switched off keeps the default, which is fine. */
+    }
+  }, []);
+
+  const sizePanel = useCallback((next) => {
+    /* Never past the point where the mockup it is describing stops being
+       visible: a panel that covers the canvas is a form, and the whole reason
+       this is a panel and not a page is that you can see what you are editing
+       while you edit it. */
+    const room = typeof window === "undefined" ? 1200 : window.innerWidth;
+    const wide = Math.round(Math.max(340, Math.min(next, Math.max(360, room - 420))));
+    setPanelWidth(wide);
+    try {
+      window.localStorage.setItem(PANEL_WIDTH_KEY, String(wide));
+    } catch {
+      /* Not being able to remember it is not a reason to refuse to do it. */
+    }
+  }, []);
+
+  const grip = useRef(null);
 
   const stage = useRef(null);
   /* The device around the screen. The phone's bezel and its outer corners are
@@ -608,6 +644,7 @@ export function Builder({ user, canSignIn = true, shared = null }) {
             "-",
             { id: "add", label: "Add a message", icon: "plus", keys: "\u2318\u21B5", run: () => addMessage() },
             { id: "member", label: "Add a member", icon: "add-friends", run: () => addUser() },
+            { id: "emoji", label: "Server emoji\u2026", icon: "emoji", run: () => setSheetOpen("emoji") },
             "-",
             { id: "appearance", label: "Appearance and chrome\u2026", icon: "settings", run: () => setSheetOpen("appearance") },
             { id: "templates", label: "Start from a template\u2026", icon: "copy-text", run: () => setSheetOpen("templates") },
@@ -1634,6 +1671,7 @@ export function Builder({ user, canSignIn = true, shared = null }) {
             data-open={panelOpen ? "true" : "false"}
             aria-hidden={!panelOpen}
             aria-label={`${tab} editor`}
+            style={panelWidth ? { width: `${panelWidth}px` } : undefined}
             onKeyDown={(event) => {
               if (event.key === "Escape") {
                 event.stopPropagation();
@@ -1641,6 +1679,58 @@ export function Builder({ user, canSignIn = true, shared = null }) {
               }
             }}
           >
+            {/* The leading edge is the handle. A panel that is pinned to the
+                right grows leftwards, so this is the edge that moves. */}
+            <div
+              ref={grip}
+              className="c-panel-grip"
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Panel width"
+              tabIndex={0}
+              onPointerDown={(event) => {
+                if (event.button !== 0) return;
+                event.currentTarget.setPointerCapture?.(event.pointerId);
+                grip.current.dragging = true;
+              }}
+              onPointerMove={(event) => {
+                if (!grip.current?.dragging) return;
+                /* Measured from the panel's own right edge to the pointer, so
+                   the edge lands under the finger rather than drifting from
+                   wherever the drag happened to start. */
+                const right = event.currentTarget.parentElement.getBoundingClientRect().right;
+                sizePanel(right - event.clientX);
+              }}
+              onPointerUp={(event) => {
+                grip.current.dragging = false;
+                event.currentTarget.releasePointerCapture?.(event.pointerId);
+              }}
+              onPointerCancel={() => {
+                if (grip.current) grip.current.dragging = false;
+              }}
+              onDoubleClick={() => {
+                /* Back to the default, because a panel dragged somewhere
+                   unhelpful should not have to be dragged back by eye. */
+                setPanelWidth(null);
+                try {
+                  window.localStorage.removeItem(PANEL_WIDTH_KEY);
+                } catch {
+                  /* nothing to forget */
+                }
+              }}
+              onKeyDown={(event) => {
+                const step = event.shiftKey ? 60 : 20;
+                const now = panelWidth ?? grip.current?.parentElement?.getBoundingClientRect().width ?? 420;
+                if (event.key === "ArrowLeft") {
+                  event.preventDefault();
+                  sizePanel(now + step);
+                } else if (event.key === "ArrowRight") {
+                  event.preventDefault();
+                  sizePanel(now - step);
+                }
+              }}
+            />
+
             <header className="c-panel-head">
               <nav className="c-dock-tabs" aria-label="Editor">
                 {["Embeds", "Components"].map((t) => (
@@ -1802,6 +1892,22 @@ export function Builder({ user, canSignIn = true, shared = null }) {
         <UsersPanel project={project} commit={commit} onError={fail} focus={focusUser} pick={avatarFor} />
       </Sheet>
 
+      {/* Server emoji.
+       *
+       * This panel has existed since the emoji work and was never rendered:
+       * it was imported, and nothing opened it. So the note inside it — "use
+       * it anywhere as :name:" — was advice about a screen nobody could get
+       * to, and there was no way to put a custom emoji in a mockup at all.
+       * Which is exactly how it was reported. */}
+      <Sheet
+        open={sheetOpen === "emoji"}
+        onClose={() => setSheetOpen(null)}
+        title="Server emoji"
+        subtitle="Pictures you upload once and use by name, the way a server's own emoji work."
+      >
+        <EmojiPanel project={project} commit={commit} onError={fail} />
+      </Sheet>
+
       <Sheet
         open={sheetOpen === "appearance"}
         onClose={() => {
@@ -1870,6 +1976,17 @@ export function Builder({ user, canSignIn = true, shared = null }) {
             <span>
               <b>New mockup</b>
               <small>A blank page. This one is kept in Backups</small>
+            </span>
+          </button>
+          <button
+            type="button"
+            className="e-more-row"
+            onClick={() => setSheetOpen("emoji")}
+          >
+            <IconMoodSmile size={18} />
+            <span>
+              <b>Server emoji</b>
+              <small>Upload a picture and use it as :name:</small>
             </span>
           </button>
           <button
@@ -1976,6 +2093,7 @@ export function Builder({ user, canSignIn = true, shared = null }) {
             run: () => exportProject(project),
           },
           { label: "Open templates", run: () => setSheetOpen("templates") },
+          { label: "Server emoji", run: () => setSheetOpen("emoji") },
           { label: "Undo", run: undo },
           { label: "Redo", run: redo },
           ...["light", "ash", "dark", "onyx"].map((theme) => ({

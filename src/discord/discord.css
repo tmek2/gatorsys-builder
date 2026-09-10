@@ -514,9 +514,29 @@
   border-radius: 0;
 }
 
+/* The markers, said out loud.
+ *
+ * Tailwind's base reset takes `list-style` off every `ul` and `ol` on the
+ * page, which is right for the editor's own lists and wrong for the one place
+ * that is drawing somebody's message: a line typed as "- one" came out as
+ * "one" with no bullet in front of it. */
 .dc-list {
   margin: 4px 0;
   padding-left: 20px;
+}
+ul.dc-list {
+  list-style: disc;
+}
+ol.dc-list {
+  list-style: decimal;
+}
+/* Nested levels change marker the way the client's do. */
+.dc-list li[data-depth="1"] {
+  list-style-type: circle;
+}
+.dc-list li[data-depth="2"],
+.dc-list li[data-depth="3"] {
+  list-style-type: square;
 }
 .dc-list li {
   margin: 2px 0;

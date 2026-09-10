@@ -835,3 +835,47 @@
   letter-spacing: 0.03em;
   text-align: center;
 }
+
+/* The panel's leading edge, as a handle.
+ *
+ * A wide target with a narrow line drawn in it: the line is what says "this
+ * moves", and eight points is what a pointer can actually catch. */
+.c-panel-grip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 3;
+  width: 9px;
+  cursor: ew-resize;
+  /* A drag along it is a drag, not a text selection of whatever it passes. */
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.c-panel-grip::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 3px;
+  width: 3px;
+  height: 46px;
+  border-radius: 999px;
+  background: var(--g-line-strong);
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity var(--g-fast) var(--g-ease-state), background var(--g-fast) var(--g-ease-state);
+}
+.c-panel-grip:hover::after,
+.c-panel-grip:focus-visible::after {
+  opacity: 1;
+  background: var(--g-accent);
+}
+.c-panel-grip:focus-visible {
+  outline: none;
+}
+/* The panel is pinned right and grows leftwards, so its own width is the only
+   thing that moves — but it must not run off the left of the window. */
+.c-panel {
+  max-width: calc(100vw - 32px);
+}

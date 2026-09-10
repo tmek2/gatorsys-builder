@@ -33,11 +33,36 @@ import { safeMedia, safeUrl } from "@/lib/urls";
  * can contain a delimiter of another rule has to come before it: a code span
  * before emphasis, because `` `**x**` `` is literal asterisks; the three-mark
  * spoiler and bold before the one-mark italic, for the obvious reason. */
+/* One custom emoji, drawn the same way whichever syntax named it. */
+function customEmoji(emoji, name, big) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      className={`dc-emoji${big ? " dc-emoji-jumbo" : ""}`}
+      src={safeMedia(emoji.src)}
+      alt={`:${name}:`}
+      draggable={false}
+    />
+  );
+}
+
 const INLINE = [
   // Code spans first: nothing inside one is parsed.
   { name: "code", re: /^(`+)([\s\S]*?[^`])\1(?!`)/ },
   // Discord's own angle-bracket forms, before autolinking can eat them.
   { name: "emoji", re: /^<(a)?:(\w+):(\d+)>/ },
+  /* The bare shortcode, which is what somebody actually types.
+   *
+   * `<:name:id>` is what a real message carries, because the client rewrites
+   * the shortcode into it on the way out — but nobody types that, and the
+   * emoji panel here says in as many words "use it anywhere as :name:". It
+   * did not work: the parser only knew the angle-bracket form, so an uploaded
+   * emoji came out as the literal text of its own name.
+   *
+   * A shortcode that names nothing in this mockup is left exactly as typed,
+   * which is also what the client does — and is why `10:30:45` and `:)` are
+   * safe. */
+  { name: "shortcode", re: /^:([a-zA-Z0-9_]{2,32}):/ },
   { name: "time", re: /^<t:(-?\d+)(?::([tTdDfFR]))?>/ },
   { name: "user", re: /^<@!?([^>]+)>/ },
   { name: "role", re: /^<@&([^>]+)>/ },
@@ -151,17 +176,21 @@ function inline(text, ctx, keyBase, big) {
           const custom = ctx.emojis?.find((e) => e.name === m[2]);
           push(
             safeMedia(custom?.src) ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                className={`dc-emoji${big ? " dc-emoji-jumbo" : ""}`}
-                src={safeMedia(custom.src)}
-                alt={`:${m[2]}:`}
-                draggable={false}
-              />
+              customEmoji(custom, m[2], big)
             ) : (
+              /* The angle-bracket form names an emoji by id, so one this
+                 mockup does not have is a picture that is missing rather than
+                 text somebody typed. Say so. */
               <span className="dc-emoji-missing" title={`:${m[2]}:`}>{`:${m[2]}:`}</span>
             ),
           );
+          break;
+        }
+        case "shortcode": {
+          const custom = ctx.emojis?.find((e) => e.name === m[1]);
+          if (safeMedia(custom?.src)) push(customEmoji(custom, m[1], big));
+          // Not one of ours, so it was never an emoji: put the text back.
+          else buffer += m[0];
           break;
         }
         case "time":
