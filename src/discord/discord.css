@@ -192,6 +192,15 @@
   grid-column: 2;
   min-width: 0;
 }
+/* Whatever a message leads with starts at the top of its row.
+   Every block a message can carry — a picture, an embed, a poll — sets an
+   eight-point gap above itself for the space between the words and the thing
+   under them. A message with no words has nothing to be spaced from, and the
+   gap became a hole above the picture: most visible in a run of picture-only
+   messages, where it stacked on top of the gap between the rows. */
+.dc-body > :first-child {
+  margin-top: 0;
+}
 
 .dc-meta {
   display: flex;
@@ -1023,9 +1032,19 @@
   border-radius: 4px;
   background: var(--background-base-lower);
 }
-.dc-gallery-cell:has(> .dc-imgtools) {
+/* A slot with no picture in it yet needs a size, or there is nothing to point
+   at and the controls that would fill it cannot be reached. A cell that HAS a
+   picture takes the picture's size: the floor was being applied to those too,
+   so a 96-point image sat in a 110-point cell with a strip of plate beside it. */
+.dc-gallery-cell:has(> .dc-imgtools):not(:has(img)):not(:has(video)) {
   min-width: 110px;
   min-height: 78px;
+}
+/* Enough of a target to hover when the picture itself has no size — a link
+   that 404s, a file that will not decode — without pushing a small one about. */
+.dc-gallery-cell:has(> .dc-imgtools) {
+  min-width: 44px;
+  min-height: 44px;
 }
 .dc-gallery-cell img,
 .dc-gallery-cell video {

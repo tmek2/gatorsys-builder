@@ -375,21 +375,27 @@ function PhoneSignal({ canvas, edit }) {
   const bars = canvas.phoneSignal ?? 4;
   const label = bars ? `${bars} of 4 bars` : "No service";
   const glyph = (
-    <svg width="16" height="11" viewBox="0 0 16.6 11" aria-hidden="true">
-      {[0, 1, 2, 3].map((i) => (
-        <rect
-          key={i}
-          x={i * 4.8}
-          y={11 - (3.4 + i * 2.2)}
-          width="3.4"
-          height={3.4 + i * 2.2}
-          rx="1.5"
-          fill="currentColor"
-          /* A bar you do not have is drawn, not faded away: the phone leaves
-             the whole ladder in place and greys the rungs above the signal. */
-          opacity={i < bars ? 1 : 0.32}
-        />
-      ))}
+    /* Measured off Apple's own status-bar artwork rather than eyeballed: four
+       bars 3.25 wide on a 5.33 pitch, sitting on one baseline, rising 4.5, 7.2,
+       9.8, 12.4 in a box 13 tall. The whole ladder is 19.25 wide. */
+    <svg width="19.25" height="13" viewBox="0 0 19.25 13" aria-hidden="true">
+      {[0, 1, 2, 3].map((i) => {
+        const tall = 4.5 + i * 2.65;
+        return (
+          <rect
+            key={i}
+            x={i * 5.33}
+            y={12.5 - tall}
+            width="3.25"
+            height={tall}
+            rx="1"
+            fill="currentColor"
+            /* A bar you do not have is drawn, not faded away: the phone leaves
+               the whole ladder in place and greys the rungs above the signal. */
+            opacity={i < bars ? 1 : 0.32}
+          />
+        );
+      })}
     </svg>
   );
   if (!edit) return glyph;
@@ -422,27 +428,28 @@ function PhoneWifi({ canvas, edit }) {
      twelve pixels it came out as a smear that read as nothing at all. Two arcs
      and a dot are the same mark and they are drawable. */
   const glyph = (
-    /* Concentric, around the dot, and struck heavily enough to read as one
-       shape. The phone's is a solid fan: at this size a hairline arc is a
-       hairline, not a wi-fi mark, and two thin ones read as scratches. */
-    <svg width="17" height="12" viewBox="0 0 18 13" fill="none" aria-hidden="true">
+    /* Also measured: 17 wide by 13 tall, a dot of radius 2, and two bands
+       about 2.4 thick struck on radii of 4.5 and 9.4 around it. Everything
+       before this was a guess at the curvature and it showed — the arcs came
+       out either flat or thin, and the mark stopped reading as wi-fi. */
+    <svg width="17" height="13" viewBox="0 0 17 13" fill="none" aria-hidden="true">
       <path
-        d="M2.9 6.2a8 8 0 0 1 12.2 0"
+        d="M1.4 4.6a9.4 9.4 0 0 1 14.2 0"
         stroke="currentColor"
-        strokeWidth="2.6"
+        strokeWidth="2.4"
         strokeLinecap="round"
         opacity={level >= 3 ? 1 : 0.32}
       />
       <path
-        d="M5.5 8.3a4.6 4.6 0 0 1 7 0"
+        d="M4 7.9a4.5 4.5 0 0 1 7.5 0"
         stroke="currentColor"
-        strokeWidth="2.6"
+        strokeWidth="2.4"
         strokeLinecap="round"
         opacity={level >= 2 ? 1 : 0.32}
       />
-      <circle cx="9" cy="11.3" r="1.6" fill="currentColor" opacity={level >= 1 ? 1 : 0.32} />
+      <circle cx="8.75" cy="10.9" r="2.05" fill="currentColor" opacity={level >= 1 ? 1 : 0.32} />
       {level === 0 ? (
-        <path d="M2.6 12.6 15.4 1.2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        <path d="M2.2 12.4 14.8 1" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
       ) : null}
     </svg>
   );
@@ -483,6 +490,10 @@ function PhoneBattery({ canvas, edit }) {
       className="dc-m-battery"
       ref={shell}
       data-state={state.id}
+      /* Full is one solid shape, outline and fill together, which is how
+         Apple's own artwork draws it — a grey ring around a white pill is
+         what a battery looks like at ninety, not at a hundred. */
+      data-full={level >= 98 ? "true" : undefined}
       style={state.color ? { "--dc-battery": state.color } : undefined}
     >
       <span className="dc-m-battery-fill" style={{ width: `${level}%` }} />
