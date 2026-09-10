@@ -23,6 +23,7 @@ import { ContextMenu } from "./menu";
 import { RenderContext } from "./context";
 import { Icon } from "./icon";
 import { InlineText } from "./inline";
+import { ImageTools } from "./image-tools";
 import { asChannel, roleColor } from "@/lib/model";
 import { groupsWith } from "@/lib/clock";
 import { Message } from "./message";
@@ -374,17 +375,19 @@ function PhoneSignal({ canvas, edit }) {
   const bars = canvas.phoneSignal ?? 4;
   const label = bars ? `${bars} of 4 bars` : "No service";
   const glyph = (
-    <svg width="18" height="12" viewBox="0 0 18 12" aria-hidden="true">
+    <svg width="17" height="12" viewBox="0 0 17.5 12" aria-hidden="true">
       {[0, 1, 2, 3].map((i) => (
         <rect
           key={i}
-          x={i * 4.5}
-          y={9 - i * 3}
-          width="3"
-          height={3 + i * 3}
-          rx="1"
+          x={i * 4.4}
+          y={9.5 - i * 2.6}
+          width="3.2"
+          height={2.5 + i * 2.6}
+          rx="1.2"
           fill="currentColor"
-          opacity={i < bars ? 1 : 0.3}
+          /* A bar you do not have is drawn, not faded away: the phone leaves
+             the whole ladder in place and greys the rungs above the signal. */
+          opacity={i < bars ? 1 : 0.42}
         />
       ))}
     </svg>
@@ -428,18 +431,18 @@ function PhoneWifi({ canvas, edit }) {
       <path
         d="M2.1 6.4a8 8 0 0 1 12.8 0"
         stroke="currentColor"
-        strokeWidth="1.8"
+        strokeWidth="2.1"
         strokeLinecap="round"
-        opacity={level >= 3 ? 1 : 0.3}
+        opacity={level >= 3 ? 1 : 0.42}
       />
       <path
         d="M4.7 8.3a4.8 4.8 0 0 1 7.6 0"
         stroke="currentColor"
-        strokeWidth="1.8"
+        strokeWidth="2.1"
         strokeLinecap="round"
-        opacity={level >= 2 ? 1 : 0.3}
+        opacity={level >= 2 ? 1 : 0.42}
       />
-      <circle cx="8.5" cy="11.2" r="1.5" fill="currentColor" opacity={level >= 1 ? 1 : 0.3} />
+      <circle cx="8.5" cy="11.2" r="1.6" fill="currentColor" opacity={level >= 1 ? 1 : 0.42} />
       {level === 0 ? (
         <path d="M2.4 12.3 14.6 1.1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
       ) : null}
@@ -489,7 +492,34 @@ function PhoneBattery({ canvas, edit }) {
         <svg className="dc-m-battery-bolt" viewBox="0 0 10 14" aria-hidden="true">
           <path d="M6.2 0 1 7.6h3L3.8 14 9 6.4H6z" fill="currentColor" />
         </svg>
-      ) : null}
+      ) : (
+        /* The number, inside the battery, the way the phone draws it with the
+           percentage turned on.
+           Two copies of it, clipped to the two sides of the fill's own edge —
+           dark on the filled side, light on the empty side — so a digit the
+           edge happens to run through is legible in both halves. One colour
+           for the whole number cannot be: centred at 28 per cent it is white
+           with its left half eaten by the fill, and at 63 it is dark with its
+           right half lost in the dark.
+           Clipped to *complementary* halves rather than stacked. Stacking them
+           put two antialiased glyphs in the same place, and every digit came
+           out with a halo of whatever was underneath. */
+        <>
+          <span
+            className="dc-m-battery-num dc-m-battery-num-on"
+            style={{ clipPath: `inset(0 ${100 - level}% 0 0)` }}
+          >
+            {level}
+          </span>
+          <span
+            className="dc-m-battery-num"
+            style={{ clipPath: `inset(0 0 0 ${level}%)` }}
+            aria-hidden="true"
+          >
+            {level}
+          </span>
+        </>
+      )}
     </span>
   );
   if (!edit) return body;
@@ -564,6 +594,71 @@ function PhoneStatus({ canvas, edit }) {
         <PhoneSignal canvas={canvas} edit={edit} />
         <PhoneWifi canvas={canvas} edit={edit} />
         <PhoneBattery canvas={canvas} edit={edit} />
+      </span>
+    </div>
+  );
+}
+
+/* Discord's You Bar.
+ *
+ * The floating bar at the bottom of the mobile app that replaced the row of
+ * tabs, the home button and the three-line server drawer. It carries who you
+ * are — a larger avatar, the display name, the status under it — and gives
+ * notifications a button of its own. Its icons sit in rounded squares rather
+ * than circles, which is the shape the rest of that redesign moved towards;
+ * the avatar stays round.
+ *
+ * Drawn from the mockup's own "you", which is a person the project does not
+ * otherwise have: a mockup is a picture of somebody else's conversation, and
+ * the one looking at it is the reader. So the name and the status are their
+ * own fields, and default to the first member who is not a bot.
+ */
+function YouBar({ canvas, users = [], edit }) {
+  const me = users.find((u) => !u.bot) ?? users[0];
+  const name = canvas.youName || me?.name || "You";
+  const status = canvas.youStatus ?? "Online";
+  return (
+    <div className="dc-you">
+      <span className="dc-you-face">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={canvas.youAvatar || me?.avatar} alt="" draggable={false} />
+        <span className="dc-presence dc-presence-online" />
+        {edit ? (
+          <ImageTools
+            value={canvas.youAvatar || me?.avatar}
+            label="picture"
+            align="start"
+            onChange={(src) => edit.canvas({ youAvatar: src })}
+            onRemove={canvas.youAvatar ? () => edit.canvas({ youAvatar: "" }) : undefined}
+          />
+        ) : null}
+      </span>
+      <span className="dc-you-who">
+        <span className="dc-you-name">
+          {edit ? (
+            <InlineText value={name} onChange={(v) => edit.canvas({ youName: v })} label="Your name" />
+          ) : (
+            name
+          )}
+        </span>
+        <span className="dc-you-status">
+          {edit ? (
+            <InlineText
+              value={status}
+              onChange={(v) => edit.canvas({ youStatus: v })}
+              label="Your status"
+              placeholder="Online"
+            />
+          ) : (
+            status
+          )}
+        </span>
+      </span>
+      {/* A rounded square, not a circle: the redesign gives each destination a
+          boundary with an app-icon silhouette and keeps the round shape for
+          faces. */}
+      <span className="dc-you-btn" aria-hidden="true">
+        <Icon name="inbox" size={19} />
       </span>
     </div>
   );
@@ -1104,6 +1199,9 @@ export function DiscordSurface({ project, selectedId, onSelect, innerRef, edit, 
             ) : (
               <Composer canvas={canvas} mobile={mobile} />
             )
+          ) : null}
+          {mobile && canvas.chrome !== "none" && canvas.showYouBar ? (
+            <YouBar canvas={canvas} users={ctx.users} edit={edit} />
           ) : null}
           {/* Last, so everything else lays out above it — which is the whole
               point of it. */}

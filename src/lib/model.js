@@ -374,6 +374,14 @@ export const newCanvas = (over = {}) => ({
   showStatusBar: true,
   phoneTime: "9:41",
   phoneBattery: 78,
+  /* Discord's You Bar: the floating bar at the bottom of the mobile app that
+     replaced the row of tabs, the home button and the server drawer. It
+     carries who you are — avatar, name, status — and a notifications button.
+     Off by default, because a mockup of a message is usually a mockup of the
+     message and not of the whole app. */
+  showYouBar: false,
+  youName: "",
+  youStatus: "Online",
   showTyping: false,
   typingNames: "Someone",
   ...over,

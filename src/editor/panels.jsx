@@ -544,6 +544,16 @@ export function CanvasPanel({ project, commit, onError, focus }) {
           onChange={(v) => set("showNewDivider", v)}
         />
         <Toggle label="Typing indicator" value={canvas.showTyping} onChange={(v) => set("showTyping", v)} />
+        {/* Phone only: it is the mobile app's bar and there is nothing like it
+            on the desktop client. */}
+        {(canvas.platform ?? "desktop") === "mobile" ? (
+          <Toggle
+            label="You Bar"
+            hint="Discord's floating bar at the bottom of the mobile app: your avatar, your name and your status. Edit them on the bar itself."
+            value={canvas.showYouBar}
+            onChange={(v) => set("showYouBar", v)}
+          />
+        ) : null}
         <Toggle
           label="Catch-up bar"
           hint="The blue rule the client puts under the header when a channel moved on without you."

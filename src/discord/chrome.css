@@ -864,19 +864,44 @@
   /* Along its length is the level; a press is the state. */
   cursor: ew-resize;
   touch-action: none;
+  /* And a drag along it is a drag, not a text selection: the number inside is
+     real text, so dragging over it was painting it blue. */
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .dc-m-battery {
   position: relative;
   display: inline-block;
-  width: 25px;
-  height: 12px;
-  padding: 2px;
+  /* Wide enough for the number inside it, which is what the phone draws when
+     the percentage is turned on — and what a mockup of a phone about to die
+     needs, since "nearly empty" is a number and not a length. */
+  width: 28px;
+  height: 13px;
+  padding: 1.5px;
   /* The shell keeps the bar's own colour whatever the battery is doing — iOS
      tints the fill, never the outline. */
   border: 1px solid color-mix(in srgb, var(--text-strong) 45%, transparent);
-  border-radius: 4px;
+  border-radius: 4.5px;
   color: var(--dc-battery, currentColor);
+}
+/* The number, over the shell's whole inside so that a clip at the fill's own
+   percentage lands exactly on the fill's edge. */
+.dc-m-battery-num {
+  position: absolute;
+  inset: 1.5px;
+  display: grid;
+  place-items: center;
+  color: var(--text-strong);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+/* The half standing on the fill takes the ground the fill is painted against. */
+.dc-m-battery-num-on {
+  color: var(--background-base-low);
 }
 /* The bolt sits over the fill in the bar's own foreground colour, which is
    what iOS does — and it has to be, because at ten per cent it is over the
@@ -906,7 +931,7 @@
   display: block;
   height: 100%;
   min-width: 0;
-  border-radius: 2px;
+  border-radius: 2.5px;
   background: currentColor;
   transition: width 90ms linear;
 }
@@ -915,4 +940,73 @@
    weight, so renaming it in place does not turn it into body text. */
 .dc-members-role {
   text-transform: uppercase;
+}
+
+/* ------------------------------------------------------------- the You Bar */
+
+/* Discord's floating bottom bar, which replaced the row of tabs. It is a bar
+   rather than an edge-to-edge strip: inset from the sides, rounded, and
+   sitting above the home indicator with the message box above it. */
+.dc-you {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+  min-height: 56px;
+  margin: 4px 16px 8px;
+  padding: 8px 10px 8px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 18px;
+  background: var(--background-base-lower);
+}
+.dc-you-face {
+  position: relative;
+  flex: none;
+}
+.dc-you-face img {
+  display: block;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+/* The presence dot is punched out of the avatar the way the member list's is,
+   so the ring around it is the bar's own ground. */
+.dc-you-face .dc-presence {
+  border-color: var(--background-base-lower);
+}
+.dc-you-who {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+}
+.dc-you-name {
+  overflow: hidden;
+  color: var(--text-strong);
+  font-size: 15px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dc-you-status {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* A rounded square rather than a circle. The redesign gives every destination
+   a boundary with an app-icon silhouette and keeps the round shape for faces. */
+.dc-you-btn {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--background-mod-subtle);
+  color: var(--text-default);
 }
