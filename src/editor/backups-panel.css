@@ -365,3 +365,39 @@
   gap: 6px;
   flex-wrap: wrap;
 }
+
+/* Renaming, on the row rather than in the browser's own dialog. */
+.b-row[data-naming="true"] {
+  padding: 6px 8px 6px 12px;
+}
+.b-rename {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1;
+  min-width: 0;
+}
+.b-rename-field {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--g-accent-line);
+  border-radius: 9px;
+  background: var(--g-fill);
+  color: var(--g-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+}
+.b-rename-field:focus-visible {
+  outline: 2px solid var(--g-accent);
+  outline-offset: -1px;
+}
+/* The one at the top names the mockup you are working on, so it is the size of
+   the name it replaces rather than the size of a form field. */
+.b-linked-field {
+  height: 28px;
+  font-size: 14px;
+  font-weight: 800;
+}

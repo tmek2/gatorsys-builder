@@ -36,6 +36,7 @@ import {
   IconDots,
   IconDownload,
   IconFileText,
+  IconFilePlus,
   IconGif,
   IconMoodSmile,
   IconPalette,
@@ -60,6 +61,7 @@ import { nextStamp, restamp } from "@/lib/clock";
 import { TEMPLATES } from "@/lib/templates";
 import { SUPPORT_URL } from "@/lib/site";
 import { loadValue, saveValue } from "@/lib/storage";
+import { saveBackup } from "@/lib/backups";
 import { migrate, validProject } from "@/lib/validate";
 import { Hint, Pick } from "./fields";
 import { Composer } from "./composer";
@@ -602,6 +604,8 @@ export function Builder({ user, canSignIn = true, shared = null }) {
 
         if (!id) {
           return [
+            { id: "new", label: "New mockup", icon: "copy-text", run: () => newMockup() },
+            "-",
             { id: "add", label: "Add a message", icon: "plus", keys: "\u2318\u21B5", run: () => addMessage() },
             { id: "member", label: "Add a member", icon: "add-friends", run: () => addUser() },
             "-",
@@ -1036,6 +1040,31 @@ export function Builder({ user, canSignIn = true, shared = null }) {
     }
   }, [fail, notify, project]);
 
+  /* A blank page to start again on.
+   *
+   * There was an "Empty" tile at the bottom of the templates sheet and nothing
+   * else, which is not where anybody looks for "new" — reported as not having
+   * the option at all. It is a button now, in the bar and in the menus.
+   *
+   * And it keeps what is on screen. Every change is written to the working
+   * copy as it is made, so starting fresh without this would throw away
+   * whatever was there with no undo across the boundary — the thing somebody
+   * pressing "new" is least expecting. A mockup that is already a named backup
+   * is already kept, so that one is left alone. */
+  const newMockup = useCallback(async () => {
+    let kept = false;
+    if (!linkedId) {
+      kept = await saveBackup(project).then(() => true).catch(() => false);
+    }
+    load(blankProject(), ID.mockup());
+    setLinkedId(null);
+    notify(
+      kept
+        ? `New mockup. \u201c${project.name}\u201d is in Backups.`
+        : "New mockup.",
+    );
+  }, [linkedId, load, notify, project]);
+
   const doShare = useCallback(async () => {
     const { url, kind, error } = await shareLink(project);
     if (error) {
@@ -1253,6 +1282,11 @@ export function Builder({ user, canSignIn = true, shared = null }) {
               fit across 393 points, and the one that has to survive that is
               the export. */}
           <span className="e-nav-desk">
+            <Hint label="Start a new mockup — this one is kept in Backups">
+              <button type="button" className="e-btn e-btn-quiet" onClick={newMockup}>
+                <IconFilePlus size={15} /> New
+              </button>
+            </Hint>
             <Hint label="Start from a template">
               <button
                 type="button"
@@ -1827,6 +1861,20 @@ export function Builder({ user, canSignIn = true, shared = null }) {
           <button
             type="button"
             className="e-more-row"
+            onClick={() => {
+              setSheetOpen(null);
+              newMockup();
+            }}
+          >
+            <IconFilePlus size={18} />
+            <span>
+              <b>New mockup</b>
+              <small>A blank page. This one is kept in Backups</small>
+            </span>
+          </button>
+          <button
+            type="button"
+            className="e-more-row"
             onClick={() => setSheetOpen("templates")}
           >
             <IconStack2 size={18} />
@@ -1915,6 +1963,7 @@ export function Builder({ user, canSignIn = true, shared = null }) {
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
         actions={[
+          { label: "New mockup", run: newMockup },
           { label: "Add a message", run: addMessage },
           { label: "Duplicate this message", run: duplicateMessage },
           { label: "Delete this message", run: removeMessage },

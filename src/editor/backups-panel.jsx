@@ -13,7 +13,7 @@
  *                  the only one that survives a new machine.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   IconCloud,
   IconCloudCheck,
@@ -25,6 +25,7 @@ import {
   IconFileText,
   IconPlus,
   IconHistory,
+  IconCheck,
   IconPencil,
   IconRefresh,
   IconTrash,
@@ -66,6 +67,68 @@ const size = (bytes) => (bytes > 1024 * 1024 ? `${(bytes / 1048576).toFixed(1)} 
  * row that remounts between the press and the release never sees the click.
  * That is why restoring, renaming and deleting all silently did nothing. */
 function BackupRow({ row, busy, onOpen, onRename, onDuplicate, onDelete, icon }) {
+  /* Renaming happens on the row.
+   *
+   * It used to call `window.prompt`, which is the browser's own dialog: it
+   * lands at the top of the window rather than on the thing being renamed, it
+   * is drawn in the browser's chrome and its language rather than this app's —
+   * "Auf mockups.gatorsys.xyz wird Folgendes angezeigt" above an OK and an
+   * Abbrechen — and some browsers offer to suppress it for the rest of the
+   * session, which quietly breaks renaming altogether. */
+  const [naming, setNaming] = useState(null);
+  const field = useRef(null);
+
+  useEffect(() => {
+    if (naming !== null) field.current?.select();
+  }, [naming]);
+
+  const commit = () => {
+    const next = (naming ?? "").trim();
+    setNaming(null);
+    if (next && next !== row.name) onRename(next);
+  };
+
+  if (naming !== null) {
+    return (
+      <li className="b-row" data-current={row.current ? "true" : "false"} data-naming="true">
+        <span className="b-rename">
+          {icon}
+          <input
+            ref={field}
+            className="b-rename-field"
+            value={naming}
+            autoFocus
+            maxLength={100}
+            aria-label={`Name for ${row.name}`}
+            onChange={(event) => setNaming(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                commit();
+              } else if (event.key === "Escape") {
+                event.preventDefault();
+                event.stopPropagation();
+                setNaming(null);
+              }
+            }}
+            /* Leaving the field keeps what was typed. A rename that is thrown
+               away because you clicked somewhere is a rename you have to do
+               twice. Escape is the way out. */
+            onBlur={commit}
+          />
+        </span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button type="button" className="e-icon-btn" onClick={commit} aria-label="Save this name">
+              <IconCheck size={14} />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Save the name</TooltipContent>
+        </Tooltip>
+      </li>
+    );
+  }
+
   return (
     <li className="b-row" data-current={row.current ? "true" : "false"}>
       <button type="button" className="b-open" onClick={onOpen} disabled={busy}>
@@ -87,7 +150,12 @@ function BackupRow({ row, busy, onOpen, onRename, onDuplicate, onDelete, icon })
       {onRename ? (
         <Tooltip>
           <TooltipTrigger asChild>
-            <button type="button" className="e-icon-btn" onClick={onRename} aria-label="Rename">
+            <button
+              type="button"
+              className="e-icon-btn"
+              onClick={() => setNaming(row.name)}
+              aria-label="Rename"
+            >
               <IconPencil size={14} />
             </button>
           </TooltipTrigger>
@@ -120,6 +188,8 @@ export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink,
   const [rows, setRows] = useState(null);
   const [cloud, setCloud] = useState(null);
   const [busy, setBusy] = useState(false);
+  /* The linked backup's name, while it is being edited on the row it names. */
+  const [namingLinked, setNamingLinked] = useState(null);
   const [noCloud, setNoCloud] = useState(false);
   const [query, setQuery] = useState("");
 
@@ -191,10 +261,8 @@ export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink,
     onNotify("Backup opened as a working copy.");
   };
 
-  const rename = async (row) => {
-    const next = window.prompt("Name this backup", row.name);
-    if (next == null) return;
-    await renameBackup(row.id, next.trim());
+  const rename = async (id, next) => {
+    await renameBackup(id, next);
     refreshLocal();
   };
 
@@ -305,10 +373,36 @@ export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink,
             <IconFileText size={17} />
           </span>
           <span className="b-linked-copy">
-            <button type="button" className="b-linked-name" onClick={() => rename(linked)}>
-              {linked.name}
-              <IconPencil size={13} />
-            </button>
+            {namingLinked === null ? (
+              <button type="button" className="b-linked-name" onClick={() => setNamingLinked(linked.name)}>
+                {linked.name}
+                <IconPencil size={13} />
+              </button>
+            ) : (
+              <input
+                className="b-rename-field b-linked-field"
+                value={namingLinked}
+                autoFocus
+                maxLength={100}
+                aria-label="Name for this backup"
+                onChange={(event) => setNamingLinked(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    event.currentTarget.blur();
+                  } else if (event.key === "Escape") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setNamingLinked(null);
+                  }
+                }}
+                onBlur={() => {
+                  const next = (namingLinked ?? "").trim();
+                  setNamingLinked(null);
+                  if (next && next !== linked.name) rename(linked.id, next);
+                }}
+              />
+            )}
             <em data-saved={savedLocally ? "true" : "false"}>
               {savedLocally ? `Saved ${when(linked.savedAt)}` : "Saving\u2026"}
             </em>
@@ -383,7 +477,7 @@ export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink,
                 row={{ ...row, current: row.id === linkedId }}
                 busy={busy}
                 onOpen={() => open(row.id)}
-                onRename={() => rename(row)}
+                onRename={(next) => rename(row.id, next)}
                 onDuplicate={() => duplicate(row)}
                 onDelete={() => remove(row.id)}
               />

@@ -151,13 +151,19 @@
   height: var(--dc-avatar);
   margin-top: 2px;
 }
+/* No plate behind it.
+ *
+ * There was one, and an avatar that is a photograph covers it completely — so
+ * it went unnoticed until somebody uploaded a picture with transparency in it
+ * and got a dark disc behind their logo. The client draws the conversation
+ * through a transparent avatar, and a background here is the tool inventing a
+ * colour the picture did not have. */
 .dc-avatar {
   width: var(--dc-avatar);
   height: var(--dc-avatar);
   border-radius: 50%;
   object-fit: cover;
   display: block;
-  background: var(--background-base-lower);
 }
 /* An avatar decoration is drawn *over* the avatar at 1.2× and centred on it,
    which is why it cannot be a border. */
@@ -1876,7 +1882,6 @@
   border: 6px solid var(--background-surface-high);
   border-radius: 50%;
   object-fit: cover;
-  background: var(--background-base-lower);
 }
 .dc-profile-decoration {
   position: absolute;
