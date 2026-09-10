@@ -23,7 +23,7 @@ import { ContextMenu } from "./menu";
 import { RenderContext } from "./context";
 import { Icon } from "./icon";
 import { InlineText } from "./inline";
-import { roleColor } from "@/lib/model";
+import { asChannel, roleColor } from "@/lib/model";
 import { groupsWith } from "@/lib/clock";
 import { Message } from "./message";
 import { ChannelStart, DateDivider, FollowChannel, NewDivider, NoAccess, UnreadBanner } from "./system";
@@ -118,13 +118,6 @@ function cycleKind(canvas, edit) {
   });
 }
 
-/* Channels are stored as strings, which is all a mockup needed until it
-   needed categories and types. Both shapes are accepted on the way in and only
-   the object shape is written back, so an older project keeps working. */
-function asChannel(entry) {
-  if (typeof entry === "string") return { name: entry, kind: "text" };
-  return { name: entry?.name ?? "channel", kind: entry?.kind ?? "text", category: entry?.category };
-}
 
 function ChannelList({ canvas, edit, scrollers, onMenu }) {
   const raw = canvas.channels?.length ? canvas.channels : [canvas.channel?.name || "general"];
@@ -426,24 +419,29 @@ function PhoneWifi({ canvas, edit }) {
      twelve pixels it came out as a smear that read as nothing at all. Two arcs
      and a dot are the same mark and they are drawable. */
   const glyph = (
-    <svg width="17" height="12" viewBox="0 0 17 12" fill="none" aria-hidden="true">
+    /* Concentric, around the dot. The arcs were drawn as two chords with a
+       radius half again too big for them, which flattened the whole mark into
+       a pair of dashes — a wi-fi symbol is mostly its curvature. These share a
+       centre with the dot and rise about a third of their own width, which is
+       what iOS's does. */
+    <svg width="16" height="12" viewBox="0 0 17 13" fill="none" aria-hidden="true">
       <path
-        d="M1.1 4.3a12.2 12.2 0 0 1 14.8 0"
+        d="M2.1 6.4a8 8 0 0 1 12.8 0"
         stroke="currentColor"
-        strokeWidth="1.9"
+        strokeWidth="1.8"
         strokeLinecap="round"
         opacity={level >= 3 ? 1 : 0.3}
       />
       <path
-        d="M4.1 7.3a7.4 7.4 0 0 1 8.8 0"
+        d="M4.7 8.3a4.8 4.8 0 0 1 7.6 0"
         stroke="currentColor"
-        strokeWidth="1.9"
+        strokeWidth="1.8"
         strokeLinecap="round"
         opacity={level >= 2 ? 1 : 0.3}
       />
-      <circle cx="8.5" cy="10.3" r="1.55" fill="currentColor" opacity={level >= 1 ? 1 : 0.3} />
+      <circle cx="8.5" cy="11.2" r="1.5" fill="currentColor" opacity={level >= 1 ? 1 : 0.3} />
       {level === 0 ? (
-        <path d="M1.6 11.4 15.4 0.9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M2.4 12.3 14.6 1.1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
       ) : null}
     </svg>
   );

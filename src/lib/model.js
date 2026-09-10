@@ -80,6 +80,18 @@ export const newRole = (over = {}) => ({
 
 /** The colour a member is drawn in: the first role that has one, then their
  *  own override, then nothing — which is the client's own order. */
+/* Channels are stored as strings, which is all a mockup needed until it needed
+   categories and types. Both shapes are accepted on the way in and only the
+   object shape is written back, so an older project keeps working.
+   It lives here rather than beside the sidebar that draws them because the
+   appearance sheet needs the same answer — and when it did not have it, the
+   sheet printed the list as "[object Object], [object Object]" and rewrote
+   every channel as a bare name the moment anybody typed in it. */
+export function asChannel(entry) {
+  if (typeof entry === "string") return { name: entry, kind: "text" };
+  return { name: entry?.name ?? "channel", kind: entry?.kind ?? "text", category: entry?.category };
+}
+
 export function roleColor(user, roles = []) {
   for (const id of user?.roles ?? []) {
     const role = roles.find((r) => r.id === id);

@@ -107,6 +107,9 @@ export function Builder({ user, canSignIn = true, shared = null }) {
      opening Members hid the message you were editing. They are sheets now —
      the message and its preview stay behind them. */
   const [sheetOpen, setSheetOpen] = useState(null);
+  /* Which control inside the sheet was asked for, when it was opened from
+     something on the canvas rather than from the toolbar. */
+  const [sheetField, setSheetField] = useState(null);
   const [tab, setTab] = useState("Content");
   const [selected, setSelected] = useState(null);
   /* Where a press on the stage started, so a drag can be told from a click. */
@@ -484,9 +487,13 @@ export function Builder({ user, canSignIn = true, shared = null }) {
         })),
       /** The message whose words have been asked to open, if any. */
       editing: editingId,
-      /* The server's own settings, opened from the server's own icon. */
+      /* The server's own settings, opened from the server's own icon — and
+         opened *at* the icon's field, not at the top of a sheet with it four
+         rows down. Pressing a picture and being put somewhere else is the
+         press not having been answered. */
       server: () => {
         setAvatarFor(null);
+        setSheetField("server-icon");
         setSheetOpen("appearance");
       },
       member: (id) => {
@@ -1670,7 +1677,10 @@ export function Builder({ user, canSignIn = true, shared = null }) {
 
       <Sheet
         open={sheetOpen === "appearance"}
-        onClose={() => setSheetOpen(null)}
+        onClose={() => {
+          setSheetField(null);
+          setSheetOpen(null);
+        }}
         title="Appearance"
         subtitle="Which client, which of Discord’s four themes, and how much of the window is drawn around the message."
       >
@@ -1678,6 +1688,7 @@ export function Builder({ user, canSignIn = true, shared = null }) {
           project={project}
           commit={commit}
           onError={fail}
+          focus={sheetOpen === "appearance" ? sheetField : null}
         />
       </Sheet>
 

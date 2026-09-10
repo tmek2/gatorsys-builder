@@ -11,7 +11,7 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import { AVATAR_COUNT, avatarUrl } from "@/lib/avatars";
-import { newRole, newUser } from "@/lib/model";
+import { asChannel, newRole, newUser } from "@/lib/model";
 import {
   ColorField,
   Empty,
@@ -364,8 +364,24 @@ export function EmojiPanel({ project, commit, onError }) {
 
 /* --------------------------------------------------------------- canvas */
 
-export function CanvasPanel({ project, commit, onError }) {
+export function CanvasPanel({ project, commit, onError, focus }) {
   const canvas = project.canvas;
+
+  /* Land on the control that was pressed.
+     Pressing the server's icon on the canvas opens this sheet, and a sheet that
+     opens at the top with the icon four fields down is a sheet that has not
+     answered the press. The field is scrolled to and its own input focused, one
+     frame after the sheet is up so there is something to scroll. */
+  useEffect(() => {
+    if (!focus) return undefined;
+    const id = window.setTimeout(() => {
+      const node = document.querySelector(`[data-field="${focus}"]`);
+      if (!node) return;
+      node.scrollIntoView({ block: "center", behavior: "smooth" });
+      node.querySelector("input, textarea")?.focus();
+    }, 80);
+    return () => window.clearTimeout(id);
+  }, [focus]);
   /* Tagged per field: dragging the width slider is one undo step, not one per
      pixel, and moving to a different control starts a new one. */
   const set = (key, value) => commit((p) => ({ ...p, canvas: { ...p.canvas, [key]: value } }), `canvas:${key}`);
@@ -479,15 +495,34 @@ export function CanvasPanel({ project, commit, onError }) {
               </Field>
               <ImageField
                 square
+                name="server-icon"
                 label="Server icon"
                 value={canvas.server?.icon}
                 onChange={(v) => setIn("server", { icon: v })}
                 onError={onError}
               />
-              <Field label="Other channels" hint="Comma separated. They fill the sidebar.">
+              {/* Names, not the objects they are stored as — and what a
+                  channel already is survives being renamed here: a channel
+                  that keeps its name keeps its type and its category, and only
+                  a name that is new starts as a text channel. Typing in this
+                  box used to flatten every one of them back to a bare name. */}
+              <Field
+                label="Other channels"
+                hint="Comma separated. They fill the sidebar. Their types and categories are set on the sidebar itself."
+              >
                 <Text
-                  value={(canvas.channels ?? []).join(", ")}
-                  onChange={(v) => set("channels", v.split(",").map((s) => s.trim()).filter(Boolean))}
+                  value={(canvas.channels ?? []).map((c) => asChannel(c).name).join(", ")}
+                  onChange={(v) => {
+                    const had = (canvas.channels ?? []).map(asChannel);
+                    set(
+                      "channels",
+                      v
+                        .split(",")
+                        .map((s) => s.trim())
+                        .filter(Boolean)
+                        .map((name) => had.find((c) => c.name === name) ?? { name, kind: "text" }),
+                    );
+                  }}
                 />
               </Field>
             </>

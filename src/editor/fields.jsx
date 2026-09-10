@@ -377,7 +377,7 @@ export function ColorField({ value, onChange, allowNone = false, label = "Choose
  * URI, which travels inside the project file and works offline but counts
  * against the cloud backup's size limit; a URL costs nothing and breaks if the
  * host goes away. The field says which one is in use rather than hiding it. */
-export function ImageField({ value, onChange, label, hint, onError, round = false, square = round }) {
+export function ImageField({ value, onChange, label, hint, onError, round = false, square = round, name }) {
   const [mode, setMode] = useState(() => (value?.startsWith("data:") ? "file" : "url"));
   const input = useRef(null);
 
@@ -405,7 +405,10 @@ export function ImageField({ value, onChange, label, hint, onError, round = fals
   };
 
   return (
-    <div className="e-image">
+    /* `name` is how something outside can point at this field — the server's
+       icon on the canvas opens the sheet and then has to say *which* control it
+       meant, or the sheet just opens at the top and leaves you looking for it. */
+    <div className="e-image" data-field={name}>
       <div className="e-field-head">
         <span className="e-field-label">{label}</span>
         <Segmented

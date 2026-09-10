@@ -986,8 +986,15 @@
   border-radius: 8px;
   overflow: hidden;
 }
+/* One picture is drawn at its own size.
+   The column was a full-width `1fr`, so a 320-wide picture sat in a 550-wide
+   cell and the cell painted its loading plate across the other 230 — a picture
+   with a long grey tail after it. The client hugs a single attachment; so does
+   this. Two or more still share the width equally, which is what a grid of
+   thumbnails is for. */
 .dc-grid-1 {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, max-content);
+  width: fit-content;
 }
 .dc-grid-2,
 .dc-grid-4 {
