@@ -419,27 +419,31 @@ function PhoneWifi({ canvas, edit }) {
   /* Three parts, the way iOS draws it: the dot, then two arcs over it. A
      weaker signal dims the outer ones rather than removing them, so the mark
      keeps its shape and only its weight changes. Nothing connected gets the
-     line through it. */
+     line through it.
+
+     Stroked arcs rather than filled crescents. The filled version was three
+     hand-written paths whose curves did not meet their own end points, and at
+     twelve pixels it came out as a smear that read as nothing at all. Two arcs
+     and a dot are the same mark and they are drawable. */
   const glyph = (
-    <svg width="17" height="12" viewBox="0 0 17 12" aria-hidden="true">
+    <svg width="17" height="12" viewBox="0 0 17 12" fill="none" aria-hidden="true">
       <path
-        d="M8.5 11.2 6.1 8.7a3.4 3.4 0 0 1 4.8 0z"
-        fill="currentColor"
-        opacity={level >= 1 ? 1 : 0.3}
-      />
-      <path
-        d="M3.9 6.4a6.6 6.6 0 0 1 9.2 0l1.4-1.5a8.7 8.7 0 0 0-12 0z"
-        fill="currentColor"
-        opacity={level >= 2 ? 1 : 0.3}
-        transform="translate(0,1.6)"
-      />
-      <path
-        d="M1.5 3.5a10 10 0 0 1 14 0L16.9 2a12 12 0 0 0-16.8 0z"
-        fill="currentColor"
+        d="M1.1 4.3a12.2 12.2 0 0 1 14.8 0"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
         opacity={level >= 3 ? 1 : 0.3}
       />
+      <path
+        d="M4.1 7.3a7.4 7.4 0 0 1 8.8 0"
+        stroke="currentColor"
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        opacity={level >= 2 ? 1 : 0.3}
+      />
+      <circle cx="8.5" cy="10.3" r="1.55" fill="currentColor" opacity={level >= 1 ? 1 : 0.3} />
       {level === 0 ? (
-        <path d="M2 11 15 1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        <path d="M1.6 11.4 15.4 0.9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
       ) : null}
     </svg>
   );

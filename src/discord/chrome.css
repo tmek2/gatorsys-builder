@@ -411,7 +411,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 52px;
+  height: 48px;
   flex: none;
   padding: 0 16px;
   background: var(--background-base-low);
@@ -445,7 +445,10 @@
   gap: 10px;
   flex: none;
   min-height: 44px;
-  margin: 8px 12px 6px;
+  /* 16, like everything else on this screen. It was 12, so the message box
+     started four points left of every message above it — the sort of thing
+     nobody names and everybody sees. */
+  margin: 8px 16px 6px;
   padding: 0 14px;
   border-radius: 999px;
   background: var(--input-background);
@@ -458,7 +461,7 @@
    notice into the screen's bottom corners. */
 .dc-mobile .dc-no-access,
 .dc-mobile .dc-follow {
-  margin: 8px 12px 6px;
+  margin: 8px 16px 6px;
 }
 
 /* The phone's message grid.
@@ -481,9 +484,11 @@
   width: 40px;
   height: 40px;
 }
+/* 16, which is what the client sets a message in on a phone. At 15 the mockup
+   read as a slightly shrunken desktop rather than as the app. */
 .dc-mobile .dc-content,
 .dc-mobile .dc-text-display {
-  font-size: 15px;
+  font-size: 16px;
 }
 .dc-mobile .dc-time {
   font-size: 11px;
@@ -673,8 +678,21 @@
   margin: 0;
   font-size: 15px;
 }
+/* The top of the channel, at the size the phone draws it. A 68-point circle
+   and a 26-point heading are the desktop's, and on a 393-point screen they are
+   most of the first screenful before a single message. */
+.dc-mobile .dc-channel-start {
+  padding: 12px 16px 4px;
+}
+.dc-mobile .dc-channel-start-mark {
+  width: 56px;
+  height: 56px;
+}
 .dc-mobile .dc-channel-start h2 {
-  font-size: 26px;
+  font-size: 22px;
+}
+.dc-mobile .dc-channel-start p {
+  font-size: 14px;
 }
 
 /* Follow this channel. A card above the composer with one wide button, which
@@ -723,6 +741,22 @@
   font-size: 14px;
 }
 
+/* A gift on a phone.
+   Three columns of art, words and a button do not fit across a 309-point
+   message column — the words came out one syllable per line. The art and the
+   words share the first row and the button takes the second, which is what the
+   client does when the card is narrow. */
+.dc-mobile .dc-gift {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.dc-mobile .dc-gift-copy {
+  flex: 1 1 140px;
+}
+.dc-mobile .dc-gift-btn {
+  width: 100%;
+}
+
 /* ------------------------------------------------- the phone's status bar */
 
 /* iOS's own numbers on a 393pt screen: a 54pt bar, the time centred in the
@@ -752,9 +786,23 @@
   letter-spacing: -0.01em;
 }
 /* Centred in the space left of the island, which is where iOS puts it —
-   not hard against the left edge. */
+   not hard against the left edge.
+
+   And a fixed width, which is the whole of the fix for the time jumping
+   sideways the moment you typed in it. The slot used to be sized by its
+   content: the text became a field, a field with no width of its own is about
+   twenty characters wide, and the slot tripled in width — which, centred,
+   dragged the time off to the left. Six characters holds "12:34" with room to
+   spare, and the digits are tabular so typing one does not shuffle the rest. */
 .dc-m-status-time {
   justify-self: center;
+  width: 6ch;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.dc-m-status-time .dc-inline-field {
+  width: 100%;
+  text-align: center;
 }
 /* 125 x 37, 11pt down from the top edge — the island, at its real size. It is
    black on every theme because it is a hole in the screen, not a surface the

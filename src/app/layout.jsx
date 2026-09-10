@@ -40,7 +40,7 @@ const inter = Inter({
 /* Bumped whenever an icon or the link-preview card changes. See the note on
    `icons` below: this is the only thing that gets a browser — or a crawler —
    to let go of the one it has already cached. */
-const ICON_VERSION = "5";
+const ICON_VERSION = "6";
 
 export const metadata = {
   metadataBase: new URL("https://mockups.gatorsys.xyz"),
@@ -98,11 +98,15 @@ export const metadata = {
      image and said it had five, so every ask for a 32 — which is what a tab
      wants on a scaled Windows display — got a 16 stretched to fit.
 
-     And the mark is drawn whole. Its tile used to be worked out by hand from
-     a raster, and the arithmetic was wrong in a way nothing checked: the box
-     cut the tail and the feet off at all four edges. It is measured from the
-     path now, and sized so the mark stands at about three quarters of the
-     tile's height, which is where a tall mark sits on Apple's icon grid. */
+     And the mark is drawn whole, at the size the rest of Gator draws it. Its
+     tile used to be worked out by hand from a raster, and the arithmetic was
+     wrong in a way nothing checked: the box cut the tail and the feet off at
+     all four edges. Then it was measured but held at three quarters of the
+     tile, which put this tab's mark visibly smaller than gatorsys.xyz's in
+     the tab beside it — the same animal at two sizes. gatorsys draws it at
+     `viewBox="0 0 554 604"`, which is the path's own bounds and no margin, so
+     that is what this uses; the square rasters fit its height and centre its
+     width, which is what a browser does with gatorsys's own PNG. */
   icons: {
     icon: [
       { url: `/favicon.svg?v=${ICON_VERSION}`, type: "image/svg+xml" },

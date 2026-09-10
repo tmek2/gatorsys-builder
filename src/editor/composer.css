@@ -639,13 +639,36 @@
 .c-pick-search:focus {
   border-color: var(--g-accent, #f7a8c4);
 }
+/* The panel has a ceiling and one scrolling region inside it.
+   Every grid used to scroll on its own with a 220-point maximum, which for a
+   single grid looked fine and for ten sticker packs stacked one 220-point
+   scroller on another until the popover was taller than the screen it was
+   drawn on. */
+.c-pick-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: min(340px, 46dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.c-pick-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 .c-pick-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(46px, 1fr));
   gap: 4px;
-  max-height: 220px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+}
+/* A grid that is not the tab you are on is not drawn at all — but if one is
+   ever marked hidden again, this is what makes that mean something. A
+   `display` of any kind beats the browser's own rule for the attribute. */
+.c-pick-grid[hidden],
+.c-pick-body[hidden] {
+  display: none;
 }
 .c-pick-cell {
   display: grid;
@@ -678,8 +701,13 @@
 /* Discord's sticker packs come with names, and a grid of two hundred stickers
    with no headings is a wall. */
 .c-pick-pack {
-  margin: 6px 0 4px;
-  color: var(--g-ink-dim);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0;
+  padding: 4px 2px;
+  background: var(--mac-pane-bg, var(--g-surface));
+  color: var(--g-ink-faint);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.04em;

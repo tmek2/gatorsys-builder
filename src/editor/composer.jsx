@@ -52,15 +52,16 @@ export const TOOLS = [
  * And a picker means a picker. The first version offered a file dialog and a
  * URL field and nothing else, which is not what any of Discord's are: theirs
  * open on a grid you choose from and keep the upload for the case the grid
- * cannot answer. There is no Tenor here and no sticker store, so the grid is
+ * cannot answer. So this one opens on a grid too — Discord's own sticker
+ * packs, or Giphy's GIFs — and behind those the grid is
  * built from what this tool actually has — every picture already in the
  * mockup, and the emoji library at sticker size, both searchable.
  */
 function MediaPick({ icon, label, hint, what, kind, accept = "image/*", size = 20, project, onPick }) {
   const [open, setOpen] = useState(false);
   /* Open on the real thing when there is one — Discord's sticker packs, or
-     Tenor — and on what is already in the mockup otherwise. */
-  const [tab, setTab] = useState(kind === "sticker" ? "packs" : kind === "gif" ? "tenor" : "mockup");
+     Giphy — and on what is already in the mockup otherwise. */
+  const [tab, setTab] = useState(kind === "sticker" ? "packs" : kind === "gif" ? "gifs" : "mockup");
   /* Fetched once, when the tab that needs it is first looked at. */
   const [remote, setRemote] = useState(null);
   const [term, setTerm] = useState("");
@@ -88,13 +89,13 @@ function MediaPick({ icon, label, hint, what, kind, accept = "image/*", size = 2
     };
   }, [open]);
 
-  /* Discord's own sticker packs, and Tenor for the GIFs, both through this
+  /* Discord's own sticker packs, and Giphy for the GIFs, both through this
      app's own routes: the upstreams send no CORS header and a key must not
      reach the browser. Loaded when the tab is opened rather than on mount, so
      a picker somebody only wanted for an upload costs no request. */
   useEffect(() => {
     if (!open) return undefined;
-    if (tab !== "packs" && tab !== "tenor") return undefined;
+    if (tab !== "packs" && tab !== "gifs") return undefined;
     let alive = true;
     const url = tab === "packs" ? "/api/stickers" : `/api/gifs?q=${encodeURIComponent(term.trim())}`;
     setRemote((r) => (r?.for === tab && tab === "packs" ? r : null));
@@ -147,7 +148,7 @@ function MediaPick({ icon, label, hint, what, kind, accept = "image/*", size = 2
      GIF and offering it as one would be a lie. */
   const tabs = [
     ...(kind === "sticker" ? [{ id: "packs", label: "Stickers" }] : []),
-    ...(kind === "gif" ? [{ id: "tenor", label: "GIFs" }] : []),
+    ...(kind === "gif" ? [{ id: "gifs", label: "GIFs" }] : []),
     { id: "mockup", label: "In this mockup" },
     ...(kind === "sticker" ? [{ id: "emoji", label: "Emoji" }] : []),
     { id: "add", label: "Upload or link" },
@@ -241,111 +242,119 @@ function MediaPick({ icon, label, hint, what, kind, accept = "image/*", size = 2
                 aria-label="Search"
                 onChange={(event) => setTerm(event.target.value)}
               />
-              {/* Discord's packs, or Tenor. Both can be missing — one because
-                  the upstream is unreachable, the other because this
-                  deployment has no Tenor key — and a picker that says so is
-                  better than a search box that silently returns nothing. */}
-              {tab === "packs" || tab === "tenor" ? (
-                remote?.for !== tab ? (
-                  <p className="c-pick-empty">Loading…</p>
-                ) : remote.unconfigured ? (
-                  <p className="c-pick-empty">
-                    GIFs come from Tenor, and this deployment has no Tenor key set.
-                    The other tabs still work.
-                  </p>
-                ) : remote.unavailable ? (
-                  <p className="c-pick-empty">
-                    Could not reach {tab === "packs" ? "Discord" : "Tenor"} just now.
-                  </p>
-                ) : tab === "tenor" ? (
-                  <div className="c-pick-grid c-pick-grid-wide">
-                    {(remote.gifs ?? []).map((gif) => (
-                      <button
-                        key={gif.id}
-                        type="button"
-                        className="c-pick-cell"
-                        title={gif.label}
-                        aria-label={gif.label}
-                        onClick={() => choose(gif.src)}
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={gif.preview} alt="" loading="lazy" />
-                      </button>
-                    ))}
-                    {(remote.gifs ?? []).length ? null : (
-                      <p className="c-pick-empty">Nothing matched that.</p>
-                    )}
+              {/* One scrolling body, and only one.
+                  Every pack used to bring its own scrolling grid and the panel
+                  itself had no ceiling, so ten packs made a popover thousands
+                  of pixels tall that ran off the top of the window. And the
+                  grid for the other tabs was drawn underneath all of it: it
+                  was marked `hidden`, which a stylesheet saying `display: grid`
+                  quietly overrules. Nothing is hidden here — what is not the
+                  current tab is not rendered. */}
+              <div className="c-pick-body">
+                {tab === "packs" || tab === "gifs" ? (
+                  remote?.for !== tab ? (
+                    <p className="c-pick-empty">Loading…</p>
+                  ) : remote.unconfigured ? (
+                    <p className="c-pick-empty">
+                      GIFs come from Giphy, and this deployment has no Giphy key set.
+                      The other tabs still work.
+                    </p>
+                  ) : remote.unavailable ? (
+                    <p className="c-pick-empty">
+                      Could not reach {tab === "packs" ? "Discord" : "Giphy"} just now.
+                    </p>
+                  ) : tab === "gifs" ? (
+                    <div className="c-pick-grid c-pick-grid-wide">
+                      {(remote.gifs ?? []).map((gif) => (
+                        <button
+                          key={gif.id}
+                          type="button"
+                          className="c-pick-cell"
+                          title={gif.label}
+                          aria-label={gif.label}
+                          onClick={() => choose(gif.src)}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={gif.preview} alt="" loading="lazy" />
+                        </button>
+                      ))}
+                      {(remote.gifs ?? []).length ? null : (
+                        <p className="c-pick-empty">Nothing matched that.</p>
+                      )}
+                    </div>
+                  ) : (
+                    (() => {
+                      const packs = (remote.packs ?? [])
+                        .map((pack) => ({
+                          ...pack,
+                          stickers: term.trim()
+                            ? pack.stickers.filter((x) =>
+                                x.name.toLowerCase().includes(term.trim().toLowerCase()),
+                              )
+                            : pack.stickers,
+                        }))
+                        .filter((pack) => pack.stickers.length);
+                      if (!packs.length) return <p className="c-pick-empty">Nothing matched that.</p>;
+                      return packs.map((pack) => (
+                        <section key={pack.id} className="c-pick-section">
+                          <h3 className="c-pick-pack">{pack.name}</h3>
+                          <div className="c-pick-grid">
+                            {pack.stickers.map((sticker) => (
+                              <button
+                                key={sticker.id}
+                                type="button"
+                                className="c-pick-cell"
+                                title={sticker.name}
+                                aria-label={sticker.name}
+                                onClick={() => choose(sticker.src)}
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={sticker.src} alt="" loading="lazy" />
+                              </button>
+                            ))}
+                          </div>
+                        </section>
+                      ));
+                    })()
+                  )
+                ) : (tab === "mockup" ? shownMine : shownEmoji).length ? (
+                  <div className="c-pick-grid">
+                    {tab === "mockup"
+                      ? shownMine.map((item) => (
+                          <button
+                            key={item.src}
+                            type="button"
+                            className="c-pick-cell"
+                            title={item.label}
+                            aria-label={item.label}
+                            onClick={() => choose(item.src)}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={item.src} alt="" loading="lazy" />
+                          </button>
+                        ))
+                      : shownEmoji.map((e) => (
+                          <button
+                            key={e.char}
+                            type="button"
+                            className="c-pick-cell"
+                            title={e.keywords.split(" ")[0]}
+                            aria-label={e.keywords.split(" ")[0]}
+                            onClick={() => choose(twemojiUrl(e.char))}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={twemojiUrl(e.char)} alt="" loading="lazy" />
+                          </button>
+                        ))}
                   </div>
                 ) : (
-                  (remote.packs ?? [])
-                    .map((pack) => ({
-                      ...pack,
-                      stickers: term.trim()
-                        ? pack.stickers.filter((x) =>
-                            x.name.toLowerCase().includes(term.trim().toLowerCase()),
-                          )
-                        : pack.stickers,
-                    }))
-                    .filter((pack) => pack.stickers.length)
-                    .map((pack) => (
-                      <div key={pack.id}>
-                        <div className="c-pick-pack">{pack.name}</div>
-                        <div className="c-pick-grid">
-                          {pack.stickers.map((sticker) => (
-                            <button
-                              key={sticker.id}
-                              type="button"
-                              className="c-pick-cell"
-                              title={sticker.name}
-                              aria-label={sticker.name}
-                              onClick={() => choose(sticker.src)}
-                            >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={sticker.src} alt="" loading="lazy" />
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))
-                )
-              ) : null}
-
-              <div className="c-pick-grid" hidden={tab === "packs" || tab === "tenor"}>
-                {tab === "mockup"
-                  ? shownMine.map((item) => (
-                      <button
-                        key={item.src}
-                        type="button"
-                        className="c-pick-cell"
-                        title={item.label}
-                        aria-label={item.label}
-                        onClick={() => choose(item.src)}
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={item.src} alt="" loading="lazy" />
-                      </button>
-                    ))
-                  : shownEmoji.map((e) => (
-                      <button
-                        key={e.char}
-                        type="button"
-                        className="c-pick-cell"
-                        title={e.keywords.split(" ")[0]}
-                        aria-label={e.keywords.split(" ")[0]}
-                        onClick={() => choose(twemojiUrl(e.char))}
-                      >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={twemojiUrl(e.char)} alt="" loading="lazy" />
-                      </button>
-                    ))}
+                  <p className="c-pick-empty">
+                    {tab === "mockup"
+                      ? "Nothing here yet. Anything you add to this mockup shows up in this list."
+                      : "No emoji match that."}
+                  </p>
+                )}
               </div>
-              {tab === "packs" || tab === "tenor" || (tab === "mockup" ? shownMine : shownEmoji).length ? null : (
-                <p className="c-pick-empty">
-                  {tab === "mockup"
-                    ? "Nothing here yet. Anything you add to this mockup shows up in this list."
-                    : "No emoji match that."}
-                </p>
-              )}
             </>
           )}
         </div>

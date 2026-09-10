@@ -642,7 +642,7 @@
 /* ---------------------------------------------------------------- embed */
 
 .dc-embed {
-  max-width: 520px;
+  max-width: min(520px, 100%);
   margin-top: 8px;
   padding: 12px 16px 16px 12px;
   border: 1px solid var(--border-subtle);
@@ -745,7 +745,7 @@
 .dc-embed-image {
   display: block;
   width: 100%;
-  max-width: 400px;
+  max-width: min(400px, 100%);
   margin-top: 16px;
   border-radius: 4px;
   object-fit: cover;
@@ -778,7 +778,7 @@
   flex-direction: column;
   gap: 8px;
   margin-top: 8px;
-  max-width: 600px;
+  max-width: min(600px, 100%);
 }
 .dc-blocks-nested {
   margin-top: 0;
@@ -943,7 +943,7 @@
   align-items: center;
   gap: 8px;
   width: 100%;
-  max-width: 400px;
+  max-width: min(400px, 100%);
   min-height: 40px;
   padding: 0 12px;
   border: 1px solid var(--border-subtle);
@@ -981,7 +981,7 @@
 .dc-gallery {
   display: grid;
   gap: 4px;
-  max-width: 550px;
+  max-width: min(550px, 100%);
   margin-top: 8px;
   border-radius: 8px;
   overflow: hidden;
@@ -1067,7 +1067,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  max-width: 432px;
+  max-width: min(432px, 100%);
   margin-top: 8px;
   padding: 10px;
   border: 1px solid var(--border-subtle);
@@ -1113,7 +1113,7 @@
 }
 
 .dc-audio {
-  max-width: 432px;
+  max-width: min(432px, 100%);
   margin-top: 8px;
   padding: 10px;
   border: 1px solid var(--border-subtle);
@@ -1180,7 +1180,7 @@
   align-items: center;
   gap: 10px;
   width: fit-content;
-  max-width: 420px;
+  max-width: min(420px, 100%);
   margin-top: 8px;
   padding: 8px 14px 8px 8px;
   border: 1px solid var(--border-subtle);
@@ -1192,7 +1192,9 @@
   align-items: center;
   gap: 2px;
   height: 24px;
-  min-width: 180px;
+  /* A floor, but not one that can push the pill past the edge of the screen:
+     on a phone the whole voice note is narrower than this used to be. */
+  min-width: min(180px, 100%);
 }
 .dc-voice-bar {
   width: 2px;
@@ -1228,7 +1230,7 @@
 /* ----------------------------------------------------------------- polls */
 
 .dc-poll {
-  max-width: 420px;
+  max-width: min(420px, 100%);
   margin-top: 8px;
   padding: 16px;
   border: 1px solid var(--border-subtle);
@@ -1302,7 +1304,7 @@
 /* --------------------------------------------------------------- invite */
 
 .dc-invite {
-  max-width: 432px;
+  max-width: min(432px, 100%);
   margin-top: 8px;
   padding: 16px;
   border-radius: 4px;
@@ -1571,7 +1573,7 @@
   text-overflow: ellipsis;
 }
 .dc-mobile .dc-typing {
-  padding-inline: 12px;
+  padding-inline: 16px;
 }
 .dc-typing-dots {
   display: inline-flex;
@@ -2698,7 +2700,7 @@
   align-items: center;
   gap: 14px;
   width: max-content;
-  max-width: 440px;
+  max-width: min(440px, 100%);
   margin-top: 8px;
   padding: 14px 16px;
   border: 1px solid var(--border-subtle);
