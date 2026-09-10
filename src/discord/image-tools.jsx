@@ -151,30 +151,57 @@ export function ImageTools({ value, onChange, onRemove, label = "image", align =
  */
 export function ImageDrop({ onChange, label = "image", className = "" }) {
   const file = useRef(null);
+  const [over, setOver] = useState(false);
+  const take = async (chosen) => {
+    if (chosen) onChange(await fitWithin(chosen));
+  };
   return (
+    /* A dashed plate is a picture of "drop something here", so it takes a drop
+       as well as a press — and a paste, for a picture that is on the clipboard
+       rather than on disk. */
     <button
       type="button"
       className={`dc-imgdrop e-no-export ${className}`}
+      data-over={over ? "true" : "false"}
       onClick={(event) => {
         event.stopPropagation();
         file.current?.click();
       }}
       onPointerDown={(event) => event.stopPropagation()}
+      onDragOver={(event) => {
+        event.preventDefault();
+        setOver(true);
+      }}
+      onDragEnter={(event) => {
+        event.preventDefault();
+        setOver(true);
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setOver(false);
+        take(event.dataTransfer?.files?.[0]);
+      }}
+      onPaste={(event) => {
+        const item = [...(event.clipboardData?.items ?? [])].find((i) => i.kind === "file");
+        if (item) take(item.getAsFile());
+      }}
     >
       <input
         ref={file}
         type="file"
-        accept="image/*"
+        accept="image/png,image/jpeg,image/gif,image/webp,image/avif,video/mp4,video/webm"
         hidden
         onClick={(event) => event.stopPropagation()}
-        onChange={async (event) => {
+        onChange={(event) => {
           const chosen = event.target.files?.[0];
           event.target.value = "";
-          if (chosen) onChange(await fitWithin(chosen));
+          take(chosen);
         }}
       />
       <Icon name="gallery" size={18} />
-      <span>Add {label}</span>
+      <span>{over ? `Drop the ${label} here` : `Add ${label}`}</span>
     </button>
   );
 }

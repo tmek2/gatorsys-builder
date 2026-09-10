@@ -56,10 +56,39 @@ export function Embed({ embed, set }) {
   const footerIcon = safeMedia(embed.footerIcon);
   const hasSide = Boolean(thumbnail);
 
+  /* An embed with nothing in it yet.
+   *
+   * It used to be born carrying the words "Embed title" and "Embed
+   * description", which is a placeholder you have to delete before you can
+   * write — and which lands in the exported picture if you forget. The client
+   * draws an embed it has not filled in yet as grey bars, so that is what an
+   * empty one looks like here: a shape that says "text goes here" without
+   * being text. It is drawn only while editing and never exported, and the
+   * first character typed anywhere in the embed takes it away. */
+  const bare =
+    Boolean(set) &&
+    !embed.title &&
+    !embed.description &&
+    !embed.author &&
+    !embed.provider &&
+    !embed.footer &&
+    !embed.timestamp &&
+    !fields.length &&
+    !thumbnail &&
+    !image &&
+    !video;
+
   return (
     <div className="dc-embed" style={{ borderLeftColor: embed.color || "#5865f2" }}>
       <div className={`dc-embed-grid${hasSide ? " dc-embed-has-thumb" : ""}`}>
         <div className="dc-embed-main">
+          {bare ? (
+            <div className="dc-embed-ghost e-no-export" aria-hidden="true">
+              <span className="dc-embed-ghost-line" data-line="title" />
+              <span className="dc-embed-ghost-line" data-line="body" />
+            </div>
+          ) : null}
+
           {embed.provider ? <div className="dc-embed-provider">{embed.provider}</div> : null}
 
           {embed.author ? (

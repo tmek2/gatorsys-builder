@@ -19,7 +19,11 @@ export const AVATAR_SIZE = 256;
 /* An animated avatar is a real Discord thing, and a canvas would flatten it to
  * its first frame. Better a large GIF than a still one; `object-fit: cover`
  * still masks it correctly at render. */
-const ANIMATED = /^image\/(gif|apng)$/i;
+/* WebP is in here for the same reason: an animated one is common now — KLIPY
+   serves its previews as webp — and a canvas would hand back its first frame
+   with no way to tell that had happened. A still webp pays a few kilobytes for
+   the safety. */
+const ANIMATED = /^image\/(gif|apng|webp)$/i;
 
 /* SVG has no intrinsic pixel size worth cropping to, and rasterising one throws
  * away the reason to use it. It is already tiny. */

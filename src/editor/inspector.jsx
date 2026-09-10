@@ -493,7 +493,11 @@ function EmbedsTab({ message, patch, onError }) {
           type="button"
           className="e-btn e-btn-dashed"
           disabled={embeds.length >= LIMITS.embeds}
-          onClick={() => patch({ embeds: [...embeds, newEmbed({ title: "Embed title", description: "Embed description." })] })}
+          /* Empty, on purpose. The canvas draws an embed with nothing in it
+             as the client does — two grey bars — so there is no placeholder
+             text to delete before writing, and none to leave behind in the
+             exported picture. */
+          onClick={() => patch({ embeds: [...embeds, newEmbed()] })}
         >
           <IconPlus size={15} /> Add an embed
           <span className="e-btn-count">

@@ -725,3 +725,113 @@
   object-fit: cover;
   border-radius: 6px;
 }
+
+/* A file being dragged over the plate. The dashed border is the promise; this
+   is the interface keeping it. */
+.c-pick-file[data-over="true"] {
+  border-style: solid;
+  border-color: var(--g-accent);
+  background: var(--g-accent-soft);
+  color: var(--g-ink);
+}
+
+/* ------------------------------------------------------------ the GIF tab */
+
+/* The categories, which are what the picker offers before anything has been
+   typed: a name over a still from the category itself. */
+.c-pick-cats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.c-pick-cat {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  height: 54px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--g-fill-2);
+  color: #fff;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 800;
+  text-align: left;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  cursor: pointer;
+}
+.c-pick-cat img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  /* Dimmed, because the name has to be readable over whatever the still
+     happens to be. */
+  filter: brightness(0.62);
+  transition: filter 160ms ease, transform 220ms ease;
+}
+.c-pick-cat:hover img {
+  filter: brightness(0.78);
+  transform: scale(1.04);
+}
+.c-pick-cat span {
+  position: relative;
+}
+
+/* Columns of a fixed width with each tile as tall as its picture needs. A
+   square grid letterboxes every GIF that is not square, which is most of
+   them. */
+.c-pick-masonry {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  align-content: start;
+}
+.c-pick-tile {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--g-fill);
+  cursor: pointer;
+}
+.c-pick-tile img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.c-pick-tile:hover,
+.c-pick-tile:focus-visible {
+  border-color: var(--g-accent-line);
+}
+.c-pick-more {
+  height: 32px;
+  border: 1px solid var(--g-line);
+  border-radius: 9px;
+  background: var(--g-fill);
+  color: var(--g-ink);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.c-pick-more:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+/* The credit KLIPY asks for, and the answer to "where did this come from". */
+.c-pick-by {
+  margin: 0;
+  color: var(--g-ink-faint);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-align: center;
+}

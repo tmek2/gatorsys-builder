@@ -699,6 +699,38 @@
   font-size: 0.875rem;
   font-weight: 600;
 }
+/* The empty embed: the shape of the text rather than the text.
+ *
+ * Two bars, sized like the title line and the first line of the description,
+ * so a freshly added embed reads as "this is where the words go" instead of
+ * as the words "Embed title" waiting to be deleted. Editor only — it carries
+ * `e-no-export`, so nothing of it reaches a picture. */
+.dc-embed-ghost {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 2px 0 4px;
+}
+.dc-embed-ghost-line {
+  display: block;
+  border-radius: 4px;
+  /* Two of the client's own washes, one painted over the other, so the bar
+     sits a shade above the card in every theme rather than being a grey that
+     only works in one of them. */
+  background-color: var(--background-mod-normal);
+  background-image: linear-gradient(var(--background-mod-subtle), var(--background-mod-subtle));
+}
+.dc-embed-ghost-line[data-line="title"] {
+  width: 38%;
+  min-width: 96px;
+  height: 16px;
+}
+.dc-embed-ghost-line[data-line="body"] {
+  width: 62%;
+  min-width: 150px;
+  height: 14px;
+}
+
 .dc-embed-title {
   margin-bottom: 8px;
   color: var(--text-strong);
@@ -2554,6 +2586,12 @@
   font-weight: 600;
   cursor: pointer;
   transition: border-color 130ms ease, color 130ms ease, background 130ms ease;
+}
+.dc-imgdrop[data-over="true"] {
+  border-style: solid;
+  border-color: var(--control-primary-background-default, #5865f2);
+  background: var(--background-mod-subtle);
+  color: var(--text-strong);
 }
 .dc-imgdrop:hover {
   border-color: var(--text-muted);

@@ -234,6 +234,30 @@ export function Builder({ user, canSignIn = true, shared = null }) {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
+  /* A file dropped anywhere that is not a drop target.
+   *
+   * The browser's default for that is to leave the page and open the file, so
+   * a drag that misses the dashed plate by ten pixels throws away the mockup
+   * being worked on. The plates call `preventDefault` themselves, so this only
+   * has to catch what none of them did: swallow it and leave the editor where
+   * it is. */
+  useEffect(() => {
+    const swallow = (event) => {
+      if (event.defaultPrevented) return;
+      if (!event.dataTransfer?.types?.includes("Files")) return;
+      event.preventDefault();
+      /* And say so while the file is still in the air, so the cursor reads
+         "not here" rather than promising a drop that does nothing. */
+      if (event.type === "dragover") event.dataTransfer.dropEffect = "none";
+    };
+    window.addEventListener("dragover", swallow);
+    window.addEventListener("drop", swallow);
+    return () => {
+      window.removeEventListener("dragover", swallow);
+      window.removeEventListener("drop", swallow);
+    };
+  }, []);
+
   /* How much room the canvas has. A 1200px window mockup on a 390px phone has
      to be looked at somehow, and a horizontal scrollbar under a preview is the
      one thing that makes a preview useless — so the canvas is scaled down to

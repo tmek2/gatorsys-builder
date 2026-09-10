@@ -53,17 +53,40 @@ export const TOOLS = [
  * URL field and nothing else, which is not what any of Discord's are: theirs
  * open on a grid you choose from and keep the upload for the case the grid
  * cannot answer. So this one opens on a grid too — Discord's own sticker
- * packs, or Giphy's GIFs — and behind those the grid is
+ * packs, or KLIPY's GIFs — and behind those the grid is
  * built from what this tool actually has — every picture already in the
  * mockup, and the emoji library at sticker size, both searchable.
  */
-function MediaPick({ icon, label, hint, what, kind, accept = "image/*", size = 20, project, onPick }) {
+/* What each picker will take.
+ *
+ * Not `image/*` everywhere. Pressing Upload in the GIF picker and being shown
+ * every JPEG on the machine is the picker asking for something it cannot use —
+ * and then quietly accepting it, which is worse. Each kind names the formats
+ * it can actually draw. */
+const ACCEPTS = {
+  gif: "image/gif,image/webp,video/mp4,video/webm",
+  /* Discord's stickers are PNG, APNG and Lottie; the first two are the ones a
+     picture of a chat can carry, and a webp animates the same way an APNG does. */
+  sticker: "image/png,image/apng,image/webp,image/gif",
+  image: "image/png,image/jpeg,image/gif,image/webp,image/avif,video/mp4,video/webm",
+};
+
+function MediaPick({ icon, label, hint, what, kind, accept, size = 20, project, onPick }) {
+  const takes = accept ?? ACCEPTS[kind] ?? ACCEPTS.image;
   const [open, setOpen] = useState(false);
+  /* A file being dragged over the button. The button is drawn as a dashed
+     plate, which is the universal picture of "drop something here" — so it had
+     better be one. */
+  const [over, setOver] = useState(false);
   /* Open on the real thing when there is one — Discord's sticker packs, or
-     Giphy — and on what is already in the mockup otherwise. */
+     KLIPY — and on what is already in the mockup otherwise. */
   const [tab, setTab] = useState(kind === "sticker" ? "packs" : kind === "gif" ? "gifs" : "mockup");
   /* Fetched once, when the tab that needs it is first looked at. */
   const [remote, setRemote] = useState(null);
+  /* The category tiles, and how far into the results we have gone. */
+  const [categories, setCategories] = useState(null);
+  const [page, setPage] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [term, setTerm] = useState("");
   const [link, setLink] = useState("");
   const [busy, setBusy] = useState(false);
@@ -89,7 +112,7 @@ function MediaPick({ icon, label, hint, what, kind, accept = "image/*", size = 2
     };
   }, [open]);
 
-  /* Discord's own sticker packs, and Giphy for the GIFs, both through this
+  /* Discord's own sticker packs, and KLIPY for the GIFs, both through this
      app's own routes: the upstreams send no CORS header and a key must not
      reach the browser. Loaded when the tab is opened rather than on mount, so
      a picker somebody only wanted for an upload costs no request. */
@@ -99,6 +122,7 @@ function MediaPick({ icon, label, hint, what, kind, accept = "image/*", size = 2
     let alive = true;
     const url = tab === "packs" ? "/api/stickers" : `/api/gifs?q=${encodeURIComponent(term.trim())}`;
     setRemote((r) => (r?.for === tab && tab === "packs" ? r : null));
+    setPage(1);
     fetch(url)
       .then((r) => r.json())
       .then((body) => alive && setRemote({ for: tab, ...body }))
@@ -109,6 +133,39 @@ function MediaPick({ icon, label, hint, what, kind, accept = "image/*", size = 2
     /* The GIF tab re-fetches as the search changes; the sticker packs do not
        depend on it. */
   }, [open, tab, kind === "gif" ? term : ""]);
+
+  /* The categories, which are the other half of the client's GIF picker: the
+     grid you are given before you have typed anything. Fetched once per
+     opening, alongside the trending grid rather than instead of it. */
+  useEffect(() => {
+    if (!open || tab !== "gifs" || categories) return undefined;
+    let alive = true;
+    fetch("/api/gifs?categories=1")
+      .then((r) => r.json())
+      .then((body) => alive && setCategories(body.categories ?? []))
+      .catch(() => alive && setCategories([]));
+    return () => {
+      alive = false;
+    };
+  }, [open, tab, categories]);
+
+  /* One more page of the same search, appended rather than replacing — the
+     client's picker keeps going as you scroll, and a grid of twenty-four is
+     three rows. */
+  const more = async () => {
+    if (loadingMore || !remote?.hasMore) return;
+    setLoadingMore(true);
+    try {
+      const next = page + 1;
+      const body = await fetch(
+        `/api/gifs?page=${next}&q=${encodeURIComponent(term.trim())}`,
+      ).then((r) => r.json());
+      setRemote((r) => ({ ...r, gifs: [...(r?.gifs ?? []), ...(body.gifs ?? [])], hasMore: body.hasMore }));
+      setPage(next);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const mine = useMemo(
     () => (project ? projectImages(project) : []),
@@ -132,6 +189,17 @@ function MediaPick({ icon, label, hint, what, kind, accept = "image/*", size = 2
     onPick(src);
     setOpen(false);
     setTerm("");
+  };
+
+  /* One way in for a file, whether it was chosen, dropped or pasted. */
+  const take = async (chosen) => {
+    if (!chosen) return;
+    setBusy(true);
+    try {
+      choose(await fitWithin(chosen));
+    } finally {
+      setBusy(false);
+    }
   };
 
   if (!what) {
@@ -191,28 +259,45 @@ function MediaPick({ icon, label, hint, what, kind, accept = "image/*", size = 2
               <input
                 ref={file}
                 type="file"
-                accept={accept}
+                accept={takes}
                 hidden
-                onChange={async (event) => {
+                onChange={(event) => {
                   const chosen = event.target.files?.[0];
                   event.target.value = "";
-                  if (!chosen) return;
-                  setBusy(true);
-                  try {
-                    choose(await fitWithin(chosen));
-                  } finally {
-                    setBusy(false);
-                  }
+                  take(chosen);
                 }}
               />
+              {/* Dropped, pasted, or chosen. It has always been drawn as a
+                  dashed plate — the picture every interface uses for "drop it
+                  here" — and until now dropping a file on it did nothing at
+                  all except make the browser navigate away to the file. */}
               <button
                 type="button"
                 className="c-pick-file"
+                data-over={over ? "true" : "false"}
                 disabled={busy}
                 onClick={() => file.current?.click()}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  setOver(true);
+                }}
+                onDragEnter={(event) => {
+                  event.preventDefault();
+                  setOver(true);
+                }}
+                onDragLeave={() => setOver(false)}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  setOver(false);
+                  take(event.dataTransfer?.files?.[0]);
+                }}
+                onPaste={(event) => {
+                  const item = [...(event.clipboardData?.items ?? [])].find((i) => i.kind === "file");
+                  if (item) take(item.getAsFile());
+                }}
               >
                 <Icon name="upload" size={16} />
-                {busy ? "Reading…" : `Choose ${what}`}
+                {busy ? "Reading…" : over ? `Drop ${what} here` : `Choose ${what}`}
               </button>
               <span className="c-pick-or">or paste a link</span>
               <input
@@ -256,32 +341,71 @@ function MediaPick({ icon, label, hint, what, kind, accept = "image/*", size = 2
                     <p className="c-pick-empty">Loading…</p>
                   ) : remote.unconfigured ? (
                     <p className="c-pick-empty">
-                      GIFs come from Giphy, and this deployment has no Giphy key set.
+                      GIFs come from KLIPY, and this deployment has no KLIPY key set.
                       The other tabs still work.
                     </p>
                   ) : remote.unavailable ? (
                     <p className="c-pick-empty">
-                      Could not reach {tab === "packs" ? "Discord" : "Giphy"} just now.
+                      Could not reach {tab === "packs" ? "Discord" : "KLIPY"} just now.
                     </p>
                   ) : tab === "gifs" ? (
-                    <div className="c-pick-grid c-pick-grid-wide">
-                      {(remote.gifs ?? []).map((gif) => (
-                        <button
-                          key={gif.id}
-                          type="button"
-                          className="c-pick-cell"
-                          title={gif.label}
-                          aria-label={gif.label}
-                          onClick={() => choose(gif.src)}
-                        >
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={gif.preview} alt="" loading="lazy" />
-                        </button>
-                      ))}
+                    <>
+                      {/* The categories, before you have typed anything —
+                          which is what the client shows first. Pressing one
+                          searches it, so they are a way in rather than a
+                          decoration. */}
+                      {!term.trim() && categories?.length ? (
+                        <div className="c-pick-cats">
+                          {categories.map((cat) => (
+                            <button
+                              key={cat.name}
+                              type="button"
+                              className="c-pick-cat"
+                              onClick={() => setTerm(cat.name)}
+                              title={`Search ${cat.name}`}
+                            >
+                              {cat.preview ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={cat.preview} alt="" loading="lazy" />
+                              ) : null}
+                              <span>{cat.name}</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      {/* Columns of a fixed width, each cell as tall as its
+                          picture needs — the client's own layout, and the
+                          reason a grid of GIFs does not read as a grid of
+                          squares with letterboxing in them. */}
+                      <div className="c-pick-masonry">
+                        {(remote.gifs ?? []).map((gif) => (
+                          <button
+                            key={gif.id}
+                            type="button"
+                            className="c-pick-tile"
+                            style={{ aspectRatio: gif.ratio || 1 }}
+                            title={gif.label}
+                            aria-label={gif.label}
+                            onClick={() => choose(gif.src)}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={gif.preview} alt="" loading="lazy" />
+                          </button>
+                        ))}
+                      </div>
                       {(remote.gifs ?? []).length ? null : (
                         <p className="c-pick-empty">Nothing matched that.</p>
                       )}
-                    </div>
+                      {remote.hasMore ? (
+                        <button type="button" className="c-pick-more" onClick={more} disabled={loadingMore}>
+                          {loadingMore ? "Loading…" : "Show more"}
+                        </button>
+                      ) : null}
+                      {/* KLIPY asks for the credit, and a picture that came
+                          from somewhere should say where. */}
+                      <p className="c-pick-by">GIFs by KLIPY</p>
+                    </>
                   ) : (
                     (() => {
                       const packs = (remote.packs ?? [])
@@ -577,7 +701,6 @@ export function Composer({
             icon="gif"
             label="GIF"
             hint="Put a GIF in this message"
-            accept="image/gif,image/webp,image/*,video/mp4,video/webm"
             what="a GIF"
             kind="gif"
             project={project}
