@@ -1,0 +1,150 @@
+/* The host is the whole hover region: the trigger, the panel, and the gap
+   between them. Nothing here may use `margin` to make that gap — a margin is
+   outside the box and the pointer crossing it counts as leaving. */
+.g-hm {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+.g-hm-trigger {
+  display: inline-flex;
+}
+
+.g-hm-panel {
+  position: absolute;
+  top: 100%;
+  z-index: 60;
+  display: block;
+  /* The bridge. Eight pixels of the host's own hit region standing in for the
+     gap under the trigger, so reaching down for the panel never leaves. */
+  padding-top: 8px;
+}
+.g-hm[data-align="end"] .g-hm-panel {
+  right: 0;
+}
+.g-hm[data-align="start"] .g-hm-panel {
+  left: 0;
+}
+.g-hm[data-align="center"] .g-hm-panel {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.g-hm-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 216px;
+  padding: 6px;
+  border: 1px solid var(--g-line-strong);
+  border-radius: var(--g-r-container, 14px);
+  background: var(--g-raise);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.18), 0 18px 44px rgba(0, 0, 0, 0.28);
+  animation: g-hm-in 160ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+@keyframes g-hm-in {
+  from {
+    opacity: 0;
+    transform: translateY(-5px) scale(0.985);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .g-hm-card {
+    animation-duration: 1ms;
+  }
+}
+
+.g-hm-item {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 9px 11px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--g-ink);
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--g-fast, 120ms) var(--g-ease-state, ease);
+}
+.g-hm-item:hover:not(:disabled),
+.g-hm-item:focus-visible {
+  background: var(--g-fill-2);
+}
+.g-hm-item:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.g-hm-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--g-fill);
+  color: var(--g-ink-dim);
+}
+.g-hm-item:hover:not(:disabled) .g-hm-icon {
+  color: var(--g-ink);
+}
+.g-hm-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.g-hm-text b {
+  font-weight: 700;
+}
+.g-hm-text small {
+  color: var(--g-ink-faint);
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+
+/* A heading inside the panel — who you are signed in as, what this menu is
+   about. Not a row: nothing happens when you press it. */
+.g-hm-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 11px 10px;
+  border-bottom: 1px solid var(--g-line);
+  margin-bottom: 4px;
+}
+.g-hm-face {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--g-raise-2);
+}
+.g-hm-face-mono {
+  display: grid;
+  place-items: center;
+  color: var(--g-ink);
+  font-size: 13px;
+  font-weight: 800;
+}
+.g-hm-head span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.g-hm-head b {
+  font-size: 13.5px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.g-hm-head small {
+  color: var(--g-ink-faint);
+  font-size: 11.5px;
+}

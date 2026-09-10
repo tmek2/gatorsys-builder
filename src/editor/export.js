@@ -153,9 +153,10 @@ function options(project, { scale } = {}) {
  * hang.
  */
 
-/* Twenty frames a second: smooth enough that nobody counts them, and two
-   thirds of the rasters that following a 30fps source exactly would cost. */
-const STEP_MS = 50;
+/* One raster per frame is the whole cost of this, so there is a ceiling on how
+   many frames an export will draw. Past it the timeline falls back to an even
+   grid of this many. A hundred at a typical 60ms a frame is six seconds of
+   animation, which is longer than any reaction GIF. */
 const MAX_STEPS = 100;
 
 /* Whether the mockup looks as though it has an animation in it.
@@ -235,7 +236,7 @@ export async function findAnimations(node) {
  * @returns `{ error }` when there was nothing to animate, nothing otherwise.
  */
 export async function exportGif(node, project, report = () => {}) {
-  const [{ toCanvas }, { GIFEncoder, quantize, applyPalette }, { bitmapToUrl, frameAt }] =
+  const [{ toCanvas }, { GIFEncoder, quantize, applyPalette }, { bitmapToUrl, frameAt, timeline }] =
     await Promise.all([import("html-to-image"), import("gifenc"), import("./animate")]);
   await document.fonts.ready;
 
@@ -247,12 +248,9 @@ export async function exportGif(node, project, report = () => {}) {
         return { error: "Nothing in this mockup moves. Export it as a picture instead." };
       }
 
-      /* The loop is as long as the longest animation, so a mockup with a
-         two-second GIF and a one-second one plays the short one twice rather
-         than cutting the long one in half. */
-      const span = Math.max(...moving.map((m) => m.animation.duration));
-      const steps = Math.min(MAX_STEPS, Math.max(2, Math.round(span / STEP_MS)));
-      const delay = Math.round(span / steps);
+      /* The source's own frame boundaries, so the export plays at the speed
+         the GIF was made at rather than at whatever grid was convenient. */
+      const steps = timeline(moving.map((m) => m.animation), MAX_STEPS);
 
       /* Each source frame is turned into something an `<img>` will take once,
          here, rather than once per step: the same frame is shown at several
@@ -266,52 +264,72 @@ export async function exportGif(node, project, report = () => {}) {
          happened to be — a still picture where the animation was. */
       const was = moving.map(({ el }) => el.getAttribute("src"));
 
+      /* Show the frame each animation is on at `at`, and hand back the raster. */
+      const drawAt = async (at) => {
+        await Promise.all(
+          moving.map(async ({ el, animation }, i) => {
+            const frame = frameAt(animation, at);
+            let url = stills[i].get(frame);
+            if (!url) {
+              url = bitmapToUrl(frame.bitmap);
+              stills[i].set(frame, url);
+            }
+            if (el.getAttribute("src") === url) return;
+            el.setAttribute("src", url);
+            await el.decode?.().catch(() => {});
+          }),
+        );
+        const canvas = await toCanvas(node, options(project, { scale: gifScale(project) }));
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        return ctx.getImageData(0, 0, canvas.width, canvas.height);
+      };
+
       const encoder = GIFEncoder();
       let size = null;
+      let palette = null;
+      let moved = false;
+      let previous = null;
 
       try {
-        for (let step = 0; step < steps; step += 1) {
-          const at = step * delay;
+        for (let step = 0; step < steps.length; step += 1) {
+          const { at, delay } = steps[step];
+          const { data, width, height } = await drawAt(at);
 
-          await Promise.all(
-            moving.map(async ({ el, animation }, i) => {
-              const frame = frameAt(animation, at);
-              let url = stills[i].get(frame);
-              if (!url) {
-                url = bitmapToUrl(frame.bitmap);
-                stills[i].set(frame, url);
-              }
-              if (el.getAttribute("src") === url) return;
-              el.setAttribute("src", url);
-              await el.decode?.().catch(() => {});
-            }),
-          );
-
-          const canvas = await toCanvas(node, options(project, { scale: gifScale(project) }));
-          const ctx = canvas.getContext("2d", { willReadFrequently: true });
-          const { data, width, height } = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          /* Every frame the same size, because a GIF has one canvas and a raster
-             that came back a pixel taller would shear the rest of the file. */
+          /* Every frame the same size, because a GIF has one canvas and a
+             raster that came back a pixel taller would shear the rest of the
+             file. */
           size ??= { width, height };
           if (width !== size.width || height !== size.height) continue;
 
-          /* A palette per frame rather than one for the file: a mockup is flat
-             colour and small text over a photograph, and a shared 256 colours
-             spends most of them on the photograph and posterises the text. */
-          const palette = quantize(data, 256, { format: "rgb444" });
-          encoder.writeFrame(applyPalette(data, palette, "rgb444"), width, height, {
-            palette,
+          /* One palette for the whole file, built from the first frame.
+             A palette per frame re-dithers the flat background every time, so
+             a mockup that is mostly one colour shimmers all over while the
+             one thing that is actually moving gets lost in it. */
+          palette ??= quantize(data, 256, { format: "rgb565" });
+          encoder.writeFrame(applyPalette(data, palette, "rgb565"), width, height, {
+            palette: step === 0 ? palette : undefined,
             delay,
             transparent: false,
           });
 
-          report((step + 1) / steps);
+          /* Did anything actually change? A decoder that hands back the same
+             frame under different indices produces a file that is an animation
+             in name only, and handing that over as though it worked is worse
+             than saying it did not. */
+          if (!moved && previous && !same(previous, data)) moved = true;
+          previous = data;
+
+          report((step + 1) / steps.length);
         }
       } finally {
         moving.forEach(({ el }, i) => {
           if (was[i] === null) el.removeAttribute("src");
           else el.setAttribute("src", was[i]);
         });
+      }
+
+      if (!moved) {
+        return { error: "That animation came back as a single frame, so there is nothing to export but a picture." };
       }
 
       encoder.finish();
@@ -324,6 +342,19 @@ export async function exportGif(node, project, report = () => {}) {
   } finally {
     node.removeAttribute("data-exporting");
   }
+}
+
+/* Two rasters are the same picture.
+ *
+ * Compared over a stride rather than pixel by pixel: this only has to answer
+ * "did anything move", and reading every fourth pixel of a two-megapixel frame
+ * answers it just as well for a hundredth of the work. */
+function same(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 16) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
 }
 
 /* A GIF is 256 colours a frame and a hundred frames, so it grows with the

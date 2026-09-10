@@ -56,6 +56,15 @@ async function viaImageDecoder(buffer, type) {
   const decoder = new ImageDecoder({ data: buffer, type });
   try {
     await decoder.tracks.ready;
+    /* And then wait for the whole thing to be read.
+     *
+     * `frameCount` is what has been parsed so far, not what is in the file,
+     * and asking for a frame past that point is a `RangeError` — so without
+     * this a long GIF is either cut short or decoded as its first frame over
+     * and over. The buffer is already complete; this is only the decoder
+     * catching up with it. */
+    await decoder.completed;
+
     const track = decoder.tracks.selectedTrack;
     /* One frame is a picture, not an animation. Saying so here means the
        caller never sets up an export for something that does not move. */
@@ -155,6 +164,40 @@ export async function decodeAnimation(src) {
   } catch {
     return null;
   }
+}
+
+/* The moments the picture changes.
+ *
+ * Sampling on a fixed grid — every 50ms, say — resamples the animation: a
+ * source made at 60ms a frame comes back playing a fifth too fast, with some
+ * of its frames drawn twice and others not at all. So the timeline is built
+ * from the frame boundaries themselves. One animation gets exactly its own
+ * frames back at exactly its own speed; several get the union of their
+ * boundaries, which is the only timeline that is right for all of them, with
+ * the shorter ones looping inside the longest.
+ *
+ * @returns `{at, delay}[]` — when to draw, and how long to hold it.
+ */
+export function timeline(animations, cap = MAX_FRAMES) {
+  const span = Math.max(...animations.map((a) => a.duration));
+  const marks = new Set([0]);
+  for (const animation of animations) {
+    for (let base = 0; base < span; base += animation.duration) {
+      let at = base;
+      for (const frame of animation.frames) {
+        at += frame.delay;
+        if (at < span) marks.add(at);
+      }
+    }
+  }
+
+  let at = [...marks].sort((a, b) => a - b);
+  /* Too many to raster: fall back to an even grid, which is a worse timeline
+     than the real one but a better one than an export that never finishes. */
+  if (at.length > cap) {
+    at = Array.from({ length: cap }, (_, i) => Math.round((i * span) / cap));
+  }
+  return at.map((when, i) => ({ at: when, delay: Math.max(MIN_DELAY, (at[i + 1] ?? span) - when) }));
 }
 
 /** Which frame an animation is showing at `at` milliseconds into its loop. */

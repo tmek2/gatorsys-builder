@@ -81,6 +81,7 @@ import { ID } from "@/lib/ids";
 import { Palette } from "./palette";
 import { useCanvasGestures } from "./use-canvas";
 import { Sheet } from "./sheet";
+import { HoverMenu, HoverMenuItem } from "@/gator/hover-menu";
 import { floatingLayerOpen } from "./use-overlay";
 import "./editor.css";
 import "./composer.css";
@@ -1270,32 +1271,41 @@ export function Builder({ user, canSignIn = true, shared = null }) {
           >
             <IconDots size={18} />
           </button>
-          {/* Only when there is something to animate. An export button that
-              tells you there was nothing to export is a button that should not
-              have been drawn. */}
-          {animated ? (
-            <Hint label="Export the animation as a GIF">
-              <button
-                type="button"
-                className="e-btn e-btn-quiet"
-                onClick={doExportGif}
-                disabled={exporting}
-              >
-                <IconGif size={15} />{" "}
-                {gifProgress === null ? "GIF" : `${Math.round(gifProgress * 100)}%`}
+          {/* One Export button with the formats under it, rather than one
+              button per format: there were two, and a third would have been a
+              third. It opens on hover and on a press, so a finger gets the
+              same menu a pointer does. */}
+          <HoverMenu
+            align="end"
+            label="Export"
+            className="e-export"
+            trigger={
+              <button type="button" className="e-btn e-btn-solid" disabled={exporting}>
+                <IconDownload size={15} />
+                {gifProgress === null ? (exporting ? "Exporting…" : "Export") : `${Math.round(gifProgress * 100)}%`}
+                <IconChevronDown size={14} className="e-export-caret" />
               </button>
-            </Hint>
-          ) : null}
-          <Hint label={`Export a PNG at ${project.canvas.scale}×`}>
-            <button
-              type="button"
-              className="e-btn e-btn-solid"
+            }
+          >
+            <HoverMenuItem
+              icon={<IconPhotoDown size={17} />}
+              title="PNG"
+              note={`A still picture, at ${project.canvas.scale}×`}
               onClick={doExportPng}
               disabled={exporting}
-            >
-              <IconPhotoDown size={15} /> {exporting ? "Exporting…" : "PNG"}
-            </button>
-          </Hint>
+            />
+            <HoverMenuItem
+              icon={<IconGif size={17} />}
+              title="Animated GIF"
+              note={
+                animated
+                  ? "Keeps the animation moving"
+                  : "Nothing in this mockup moves yet"
+              }
+              onClick={doExportGif}
+              disabled={exporting || !animated}
+            />
+          </HoverMenu>
         </div>
       </SiteNav>
 

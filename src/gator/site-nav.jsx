@@ -11,10 +11,19 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { IconBook2, IconBrandDiscord, IconLayoutDashboard, IconLifebuoy, IconPencilBolt } from "@tabler/icons-react";
+import {
+  IconBook2,
+  IconBrandDiscord,
+  IconCloud,
+  IconLayoutDashboard,
+  IconLifebuoy,
+  IconLogout,
+  IconPencilBolt,
+} from "@tabler/icons-react";
 import { GatorLogo } from "./gator-logo";
 import { ThemeToggle } from "./theme-toggle";
 import { HoverTip } from "./hover-tip";
+import { HoverMenu, HoverMenuItem } from "./hover-menu";
 import { DOCS_URL, GATOR_URL, SUPPORT_URL } from "@/lib/site";
 import "./site-nav.css";
 
@@ -34,29 +43,71 @@ const useMeasure = typeof window === "undefined" ? useEffect : useLayoutEffect;
    that panel is already on screen behind a rail button — it opens the panel
    instead of navigating to the page it is already on. Everywhere else it is a
    link back to the tool. */
-function ProfileChip({ user, onOpen }) {
-  const face = (
-    <>
-      {user.image ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img className="g-profile-face" src={user.image} alt="" />
-      ) : (
-        <span className="g-profile-face g-profile-mono" aria-hidden="true">
-          {(user.name ?? "A").slice(0, 1).toUpperCase()}
-        </span>
-      )}
-      <span className="g-profile-name">{user.name ?? "Account"}</span>
-    </>
-  );
-
-  return onOpen ? (
-    <button type="button" className="g-profile" onClick={onOpen}>
-      {face}
-    </button>
+/* The avatar, or the first letter of the name when there is none. One
+   component because the chip and the panel it opens draw the same face at two
+   sizes, and two copies of this drifted apart once already. */
+function Face({ user, className = "g-profile-face" }) {
+  return user.image ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img className={className} src={user.image} alt="" />
   ) : (
-    <Link className="g-profile" href="/">
-      {face}
-    </Link>
+    <span className={`${className} ${className}-mono`} aria-hidden="true">
+      {(user.name ?? "A").slice(0, 1).toUpperCase()}
+    </span>
+  );
+}
+
+function ProfileChip({ user, onOpen }) {
+  const [leaving, setLeaving] = useState(false);
+
+  /* A POST, and to this app's own route: a link that signs you out is a link
+     anybody else's page can make your browser follow. */
+  const leave = async () => {
+    setLeaving(true);
+    try {
+      await fetch("/api/signout", { method: "POST" });
+      window.location.assign("/");
+    } catch {
+      setLeaving(false);
+    }
+  };
+
+  return (
+    <HoverMenu
+      align="end"
+      label="Account"
+      className="g-profile-menu"
+      trigger={
+        <button type="button" className="g-profile">
+          <Face user={user} />
+          <span className="g-profile-name">{user.name ?? "Account"}</span>
+        </button>
+      }
+    >
+      <span className="g-hm-head">
+        <Face user={user} className="g-hm-face" />
+        <span>
+          <b>{user.name ?? "Account"}</b>
+          <small>Signed in with Discord</small>
+        </span>
+      </span>
+
+      {/* On the builder this opens the panel that is already on screen; on the
+          legal pages there is no panel, so it is a link back to the tool. */}
+      <HoverMenuItem
+        icon={<IconCloud size={17} />}
+        title="Your saved mockups"
+        note="Kept on this deployment as well as in this browser"
+        {...(onOpen ? { onClick: onOpen } : { href: "/" })}
+      />
+      <HoverMenuItem
+        icon={<IconLogout size={17} />}
+        title={leaving ? "Signing out…" : "Sign out"}
+        note="Your mockups stay in this browser"
+        onClick={leave}
+        disabled={leaving}
+      />
+    </HoverMenu>
   );
 }
 
@@ -177,9 +228,10 @@ export function SiteNav({ user, canSignIn = true, compact = false, links = true,
               other Gator site keeps the account bare. All three states are
               drawn; only the third is inert. */}
           {user ? (
-            <HoverTip label="Your saved mockups" align="end">
-              <ProfileChip user={user} onOpen={onProfile} />
-            </HoverTip>
+            /* No HoverTip around this one: the menu it opens on hover says
+               everything a label would have, and two things opening on the
+               same hover is one of them fighting the other. */
+            <ProfileChip user={user} onOpen={onProfile} />
           ) : canSignIn ? (
             <HoverTip label="Sign in with Discord to keep your mockups in the cloud" align="end">
               <a className="g-signin" href="/signin">

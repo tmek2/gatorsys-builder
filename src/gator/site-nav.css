@@ -203,7 +203,10 @@
   flex: none;
   background: var(--g-raise-2);
 }
-.g-profile-mono {
+/* Named off the face rather than off the chip: the same component draws it in
+   the chip and in the panel the chip opens, and the modifier follows whichever
+   size class it was given. */
+.g-profile-face-mono {
   display: grid;
   place-items: center;
   font-size: 11px;
@@ -246,4 +249,15 @@
   .g-nav[data-compact="true"] .g-nav-bar {
     gap: 8px;
   }
+}
+
+/* The chip while its menu is open: the same treatment hover gives it, held,
+   so the pill and the panel under it read as one open thing rather than as a
+   panel that appeared next to a button. */
+.g-profile-menu[data-open="true"] .g-profile {
+  border-color: var(--g-accent-line);
+  background: var(--g-raise);
+}
+.g-profile-menu .g-hm-card {
+  min-width: 244px;
 }
