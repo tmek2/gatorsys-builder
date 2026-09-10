@@ -876,7 +876,7 @@
   /* Wide enough for the number inside it, which is what the phone draws when
      the percentage is turned on — and what a mockup of a phone about to die
      needs, since "nearly empty" is a number and not a length. */
-  width: 28px;
+  width: 27px;
   height: 13px;
   padding: 1.5px;
   /* The shell keeps the bar's own colour whatever the battery is doing — iOS
@@ -893,9 +893,12 @@
   display: grid;
   place-items: center;
   color: var(--text-strong);
-  font-size: 9px;
+  /* Smaller than the shell it sits in by a clear margin. At nine points three
+     digits ran from wall to wall and the battery stopped reading as a battery
+     with a number in it and started reading as a box with "100" wedged in. */
+  font-size: 8px;
   font-weight: 700;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.04em;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
@@ -955,7 +958,7 @@
   flex: none;
   min-height: 56px;
   margin: 4px 16px 8px;
-  padding: 8px 10px 8px 8px;
+  padding: 8px 14px 8px 8px;
   border: 1px solid var(--border-subtle);
   border-radius: 18px;
   background: var(--background-base-lower);
@@ -998,15 +1001,9 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/* A rounded square rather than a circle. The redesign gives every destination
-   a boundary with an app-icon silhouette and keeps the round shape for faces. */
-.dc-you-btn {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-  background: var(--background-mod-subtle);
-  color: var(--text-default);
+/* The avatar is the largest thing on the bar, which is the point of it:
+   Discord's own note is "a larger more expressive avatar placement". */
+.dc-you-face img {
+  width: 40px;
+  height: 40px;
 }

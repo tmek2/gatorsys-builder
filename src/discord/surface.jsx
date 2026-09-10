@@ -375,19 +375,19 @@ function PhoneSignal({ canvas, edit }) {
   const bars = canvas.phoneSignal ?? 4;
   const label = bars ? `${bars} of 4 bars` : "No service";
   const glyph = (
-    <svg width="17" height="12" viewBox="0 0 17.5 12" aria-hidden="true">
+    <svg width="16" height="11" viewBox="0 0 16.6 11" aria-hidden="true">
       {[0, 1, 2, 3].map((i) => (
         <rect
           key={i}
-          x={i * 4.4}
-          y={9.5 - i * 2.6}
-          width="3.2"
-          height={2.5 + i * 2.6}
-          rx="1.2"
+          x={i * 4.8}
+          y={11 - (3.4 + i * 2.2)}
+          width="3.4"
+          height={3.4 + i * 2.2}
+          rx="1.5"
           fill="currentColor"
           /* A bar you do not have is drawn, not faded away: the phone leaves
              the whole ladder in place and greys the rungs above the signal. */
-          opacity={i < bars ? 1 : 0.42}
+          opacity={i < bars ? 1 : 0.32}
         />
       ))}
     </svg>
@@ -422,29 +422,27 @@ function PhoneWifi({ canvas, edit }) {
      twelve pixels it came out as a smear that read as nothing at all. Two arcs
      and a dot are the same mark and they are drawable. */
   const glyph = (
-    /* Concentric, around the dot. The arcs were drawn as two chords with a
-       radius half again too big for them, which flattened the whole mark into
-       a pair of dashes — a wi-fi symbol is mostly its curvature. These share a
-       centre with the dot and rise about a third of their own width, which is
-       what iOS's does. */
-    <svg width="16" height="12" viewBox="0 0 17 13" fill="none" aria-hidden="true">
+    /* Concentric, around the dot, and struck heavily enough to read as one
+       shape. The phone's is a solid fan: at this size a hairline arc is a
+       hairline, not a wi-fi mark, and two thin ones read as scratches. */
+    <svg width="17" height="12" viewBox="0 0 18 13" fill="none" aria-hidden="true">
       <path
-        d="M2.1 6.4a8 8 0 0 1 12.8 0"
+        d="M2.9 6.2a8 8 0 0 1 12.2 0"
         stroke="currentColor"
-        strokeWidth="2.1"
+        strokeWidth="2.6"
         strokeLinecap="round"
-        opacity={level >= 3 ? 1 : 0.42}
+        opacity={level >= 3 ? 1 : 0.32}
       />
       <path
-        d="M4.7 8.3a4.8 4.8 0 0 1 7.6 0"
+        d="M5.5 8.3a4.6 4.6 0 0 1 7 0"
         stroke="currentColor"
-        strokeWidth="2.1"
+        strokeWidth="2.6"
         strokeLinecap="round"
-        opacity={level >= 2 ? 1 : 0.42}
+        opacity={level >= 2 ? 1 : 0.32}
       />
-      <circle cx="8.5" cy="11.2" r="1.6" fill="currentColor" opacity={level >= 1 ? 1 : 0.42} />
+      <circle cx="9" cy="11.3" r="1.6" fill="currentColor" opacity={level >= 1 ? 1 : 0.32} />
       {level === 0 ? (
-        <path d="M2.4 12.3 14.6 1.1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M2.6 12.6 15.4 1.2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
       ) : null}
     </svg>
   );
@@ -602,11 +600,12 @@ function PhoneStatus({ canvas, edit }) {
 /* Discord's You Bar.
  *
  * The floating bar at the bottom of the mobile app that replaced the row of
- * tabs, the home button and the three-line server drawer. It carries who you
- * are — a larger avatar, the display name, the status under it — and gives
- * notifications a button of its own. Its icons sit in rounded squares rather
- * than circles, which is the shape the rest of that redesign moved towards;
- * the avatar stays round.
+ * tabs. Discord's own description of what is on it is three things and no
+ * more: "your avatar, username, and status" — with "a larger more expressive
+ * avatar placement" and "a more polished look for your display name and
+ * status". A notifications button was drawn in here for a while on the
+ * strength of a summary of a summary; it is not in Discord's own wording and
+ * it is gone.
  *
  * Drawn from the mockup's own "you", which is a person the project does not
  * otherwise have: a mockup is a picture of somebody else's conversation, and
@@ -653,12 +652,6 @@ function YouBar({ canvas, users = [], edit }) {
             status
           )}
         </span>
-      </span>
-      {/* A rounded square, not a circle: the redesign gives each destination a
-          boundary with an app-icon silhouette and keeps the round shape for
-          faces. */}
-      <span className="dc-you-btn" aria-hidden="true">
-        <Icon name="inbox" size={19} />
       </span>
     </div>
   );
