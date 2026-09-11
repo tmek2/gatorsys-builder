@@ -80,18 +80,16 @@ export function Embed({ embed, set }) {
     !video;
 
   return (
-    /* An embed with nothing in it leaves the picture entirely.
+    /* The box exports even with nothing written in it.
      *
-     * Hiding the bars and the image plate was not enough: the embed's own box
-     * stayed, so the download carried an empty bordered rectangle where the
-     * words were going to go. Discord does not draw an embed that has no
-     * content either — the box is not the embed, the content is — so an embed
-     * still waiting for all of it exports as though it were not there. It
-     * comes back the moment anything is written in it. */
-    <div
-      className={`dc-embed${bare ? " e-no-export" : ""}`}
-      style={{ borderLeftColor: embed.color || "#5865f2" }}
-    >
+     * It briefly did not: an empty embed was dropped from the picture on the
+     * grounds that Discord will not send one. That is true of Discord and
+     * false of this, which draws pictures — an empty embed is a coloured bar
+     * and a bordered box, and somebody who put one there put it there on
+     * purpose. What must not export is the scaffolding *inside* it, the bars
+     * and the image plate, and that is handled by their own no-export flags
+     * and by the export taking them out of the layout first. */
+    <div className="dc-embed" style={{ borderLeftColor: embed.color || "#5865f2" }}>
       <div className={`dc-embed-grid${hasSide ? " dc-embed-has-thumb" : ""}`}>
         <div className="dc-embed-main">
           {bare ? <Ghost lines={["title", "body"]} /> : null}
