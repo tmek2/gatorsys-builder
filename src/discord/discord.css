@@ -194,6 +194,40 @@
   opacity: 1;
 }
 
+/* In the editor the same clock is a control, so it has to stay up while it is
+   being used: opening the picker takes the pointer off the message, and a
+   control that disappears the moment you reach for its panel is not one. */
+.dc-hover-time:focus-visible,
+.dc-hover-time[data-open="true"] {
+  opacity: 1;
+}
+
+/* The slot the picker hangs from.
+ *
+ * It takes the position the bare `time` used to carry, because wrapping it in
+ * an anchor for the picker would otherwise position the clock against a
+ * zero-width inline box and drop it into the middle of the row. */
+.dc-hover-slot {
+  position: absolute;
+  top: 3px;
+  left: 0;
+  width: 48px;
+}
+.dc-hover-slot .dc-hover-time {
+  position: static;
+  display: block;
+  width: 100%;
+}
+/* And no plate behind this one. The header's clock sits in a line of text
+   where a highlight reads as a button; this one is four faint digits in the
+   margin, and a box around them at 48 points wide is a shape the client never
+   draws. Brightening is enough to say it can be pressed. */
+.dc-hover-slot .dc-time-live:hover,
+.dc-hover-slot .dc-time-live[data-open="true"] {
+  background: none;
+  color: var(--text-strong);
+}
+
 .dc-body {
   grid-column: 2;
   min-width: 0;

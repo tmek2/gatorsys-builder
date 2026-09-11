@@ -401,7 +401,55 @@ function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, 
 
       <div className="dc-gutter">
         {grouped ? (
-          <time className="dc-hover-time">{(message.timestamp || "").split(" at ").pop()}</time>
+          /* The time on a grouped message, and the only place it can be set.
+           *
+           * A message stacked under one from the same person draws no header,
+           * and the header is where the clock used to be — so the second,
+           * third and fourth message in a run had a timestamp of their own,
+           * showed it on hover exactly as the client does, and offered no way
+           * on earth to change it. Reported as "why can't i edit the time for
+           * the messages following a message from the same person".
+           *
+           * Same control as the header's, same picker: what it sets is this
+           * message's own stamp. Push it far enough from the one above and the
+           * run breaks and this message gets its header back, which is the
+           * client's own rule rather than a decision made here. */
+          edit ? (
+            <span className="dc-time-slot dc-hover-slot">
+              <time
+                ref={clock}
+                className="dc-hover-time dc-time-live"
+                data-open={stamping ? "true" : undefined}
+                role="button"
+                tabIndex={0}
+                title="Click to set the day and time"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setStamping((v) => !v);
+                }}
+                onKeyDown={(event) => {
+                  if (event.target !== event.currentTarget) return;
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setStamping((v) => !v);
+                  }
+                }}
+              >
+                {(message.timestamp || "").split(" at ").pop()}
+              </time>
+              {stamping ? (
+                <StampPicker
+                  value={message.timestamp}
+                  onChange={(next) => edit.stamp(message.id, next)}
+                  onClose={() => setStamping(false)}
+                  anchor={clock}
+                />
+              ) : null}
+            </span>
+          ) : (
+            <time className="dc-hover-time">{(message.timestamp || "").split(" at ").pop()}</time>
+          )
         ) : (
           <span className="dc-avatar-slot">
             {edit ? (
