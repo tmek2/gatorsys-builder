@@ -98,10 +98,16 @@ function Select({ block }) {
 function Section({ block }) {
   const accessory = block.accessory ?? {};
   const { edit } = useContext(RenderContext);
+  const empty = Boolean(edit) && !block.content;
+  /* A section is its text beside an accessory. With neither there is nothing
+     to draw, so the whole row leaves the picture rather than exporting as a
+     band of empty. With an accessory the accessory stays and only the text
+     column goes. */
+  const nothing = empty && accessory.kind !== "button" && !accessory.src;
   return (
-    <div className="dc-section">
-      <div className="dc-section-text">
-        {edit && !block.content ? (
+    <div className={`dc-section${nothing ? " e-no-export" : ""}`}>
+      <div className={`dc-section-text${empty ? " e-no-export" : ""}`}>
+        {empty ? (
           <Ghost lines={["body", "short"]} />
         ) : (
           <Markdown text={block.content || ""} jumbo={false} />
@@ -161,9 +167,17 @@ function Container({ block }) {
  * this is the same thing, for the same reason, in the other layout. */
 function TextDisplay({ block }) {
   const { edit } = useContext(RenderContext);
+  const empty = Boolean(edit) && !block.content;
   return (
-    <div className="dc-text-display">
-      {edit && !block.content ? <Ghost lines={["body", "short"]} /> : <Markdown text={block.content || ""} />}
+    /* The flag goes on the block, not just on the bars inside it.
+     *
+     * Dropping only the bars left the block itself standing — forty-odd points
+     * of nothing in the middle of a container, which is worse than the bars
+     * would have been: a picture with a hole in it that nobody put there. A
+     * text display is its text, so a text display with no text is nothing, and
+     * the export leaves it out entirely. */
+    <div className={`dc-text-display${empty ? " e-no-export" : ""}`}>
+      {empty ? <Ghost lines={["body", "short"]} /> : <Markdown text={block.content || ""} />}
     </div>
   );
 }

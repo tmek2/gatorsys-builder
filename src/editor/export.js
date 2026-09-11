@@ -30,10 +30,12 @@ export async function exportPng(node, project) {
      for the duration. */
   node.setAttribute("data-exporting", "true");
   try {
-    return await withLocalPictures(node, async () => {
-      const url = await toPng(node, options(project));
-      download(url, `${safeName(project.name)}.png`);
-    });
+    return await withLocalPictures(node, () =>
+      withoutEditorChrome(node, async () => {
+        const url = await toPng(node, options(project));
+        download(url, `${safeName(project.name)}.png`);
+      }),
+    );
   } finally {
     node.removeAttribute("data-exporting");
   }
@@ -82,6 +84,35 @@ async function withLocalPictures(node, run) {
     return await run();
   } finally {
     for (const [el, was] of swapped) el.setAttribute("src", was);
+  }
+}
+
+/* Everything the export leaves out, actually taken out of the layout first.
+ *
+ * The `filter` option removes a node from the clone, and that is not the same
+ * as removing it from the picture. html-to-image copies each node's *computed*
+ * style onto its clone, and in Chrome that includes the used `height` in
+ * pixels — so every box is frozen at the size it measured on screen before any
+ * filtering happens. Drop a child out of the clone and its parent keeps the
+ * height it had with the child in it: a cleared text block came out of the
+ * download as an empty band inside the container, which is the report.
+ *
+ * So they are hidden here, in the live DOM, before anything measures it. The
+ * layout reflows, the parents settle at their real sizes, and the raster is of
+ * a mockup that genuinely does not contain them. Everything is put back in a
+ * `finally`, so an export that throws does not leave the editor missing its
+ * own furniture.
+ */
+async function withoutEditorChrome(node, run) {
+  const hidden = [...node.querySelectorAll(".e-no-export")].map((el) => [el, el.style.display]);
+  for (const [el] of hidden) el.style.display = "none";
+  /* Read something layout-dependent so the reflow has happened before the
+     raster starts measuring. */
+  void node.getBoundingClientRect().height;
+  try {
+    return await run();
+  } finally {
+    for (const [el, was] of hidden) el.style.display = was;
   }
 }
 
@@ -243,7 +274,8 @@ export async function exportGif(node, project, report = () => {}) {
 
   node.setAttribute("data-exporting", "true");
   try {
-    return await withLocalPictures(node, async () => {
+    return await withLocalPictures(node, () =>
+      withoutEditorChrome(node, async () => {
       const moving = await findAnimations(node);
       if (!moving.length) {
         return { error: "Nothing in this mockup moves. Export it as a picture instead." };
@@ -339,7 +371,8 @@ export async function exportGif(node, project, report = () => {}) {
       download(url, `${safeName(project.name)}.gif`);
       setTimeout(() => URL.revokeObjectURL(url), 1000);
       return {};
-    });
+      }),
+    );
   } finally {
     node.removeAttribute("data-exporting");
   }
