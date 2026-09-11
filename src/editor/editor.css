@@ -1243,3 +1243,21 @@
 .e-export[data-open="true"] .e-export-caret {
   transform: rotate(180deg);
 }
+
+/* The file input behind "Import a file".
+ *
+ * Not `display: none` and not `hidden`: a hidden input cannot be clicked open
+ * in every browser, and the whole job of this one is to be clicked open by a
+ * button somewhere else. So it is on the page, the size of nothing, out of the
+ * tab order and out of the way. */
+.e-file-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}

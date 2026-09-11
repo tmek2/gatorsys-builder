@@ -39,6 +39,8 @@ import {
   saveBackup,
   updateBackup,
 } from "@/lib/backups";
+import { untouched } from "@/lib/model";
+import { ID } from "@/lib/ids";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
 import { Empty, Group } from "./fields";
@@ -184,7 +186,7 @@ function BackupRow({ row, busy, onOpen, onRename, onDuplicate, onDelete, icon })
   );
 }
 
-export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink, onLoad, onError, onNotify, savedLocally }) {
+export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink, onLoad, onRenameProject, onError, onNotify, savedLocally }) {
   const [rows, setRows] = useState(null);
   const [cloud, setCloud] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -237,7 +239,11 @@ export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink,
   const makeBackup = async () => {
     setBusy(true);
     try {
-      await saveBackup(project);
+      /* And link to it. A backup this working copy is not attached to is a
+         backup the next Save cannot land on, so every Save after this one
+         would make another row instead of updating this one. */
+      const id = await saveBackup(project);
+      onLink?.(id);
       onNotify(`“${project.name}” backed up in this browser.`);
       refreshLocal();
     } catch {
@@ -247,11 +253,36 @@ export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink,
     }
   };
 
+  /* Whatever is on screen is about to be replaced, so it goes somewhere first.
+   *
+   * The working copy is where everything typed since the last Save lives, and
+   * three controls in this panel swap it out. Losing an afternoon to a click
+   * on another row is the complaint this panel exists to answer, so: into the
+   * backup it belongs to, or into one of its own if it belongs to none. The
+   * blank page is the exception — see `untouched`. */
+  const keepWorkingCopy = async () => {
+    if (untouched(project)) return;
+    if (linkedId) await updateBackup(linkedId, project);
+    else await saveBackup(project);
+  };
+
   const open = async (id) => {
     const restored = await readBackup(id).catch(() => null);
     if (!restored) {
       onError("That backup could not be read.");
       return;
+    }
+    /* Opening the backup you are already on is going back to what it holds —
+       a deliberate discard of what you have done since. Writing the working
+       copy into it first would hand you your own changes back and make the
+       control do nothing. */
+    if (id !== linkedId) {
+      try {
+        await keepWorkingCopy();
+      } catch {
+        onError("Could not keep the mockup you have open, so it was not replaced.");
+        return;
+      }
     }
     onLoad(restored);
     /* Opening a named backup links to it, so the next Save updates the thing
@@ -261,8 +292,17 @@ export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink,
     onNotify("Backup opened as a working copy.");
   };
 
+  /* A backup and the mockup it holds share a name.
+   *
+   * They used to drift: naming a backup "welcome v3" left the document called
+   * "Untitled mockup", so the title bar — the one place the name is on screen
+   * the whole time — went on naming something else. Which copy am I in is the
+   * question this panel exists to answer, and the answer has to be the same in
+   * both places. Only the one you are editing, of course; renaming somebody
+   * else's row is about the row. */
   const rename = async (id, next) => {
     await renameBackup(id, next);
+    if (id === linkedId) onRenameProject?.(next);
     refreshLocal();
   };
 
@@ -298,6 +338,9 @@ export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink,
       const res = await fetch(`/api/mockups/${id}`, { cache: "no-store" });
       if (!res.ok) throw new Error();
       const data = await res.json();
+      /* Same rule as a local row: what is on screen is kept before it is
+         replaced. See `keepWorkingCopy`. */
+      await keepWorkingCopy();
       onLoad(data.project, data.slug);
       onNotify(`Opened “${data.name}”.`);
     } catch {
@@ -333,11 +376,12 @@ export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink,
   };
 
   const createNamed = async () => {
-    const name = query.trim() || project.name;
+    const name = wanted || project.name;
     setBusy(true);
     try {
       const id = await saveBackup(project, name);
       onLink?.(id);
+      onRenameProject?.(name);
       setQuery("");
       onNotify(`\u201c${name}\u201d backed up in this browser.`);
       refreshLocal();
@@ -348,11 +392,44 @@ export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink,
     }
   };
 
+  /* Duplicating leaves you editing the duplicate.
+   *
+   * It used to make the copy and leave you on whatever you were editing
+   * before, with nothing on screen changed to say so. So you copy a mockup,
+   * make your changes, press Save — and the save lands on the original while
+   * the copy sits frozen at the moment it was made. Reported as an afternoon
+   * gone: “only the original before my edits were there, now it's just
+   * duplicates”. A duplicate is a branch, and the reason anybody makes one is
+   * to work on it. */
   const duplicate = async (row) => {
-    const copy = await readBackup(row.id).catch(() => null);
-    if (!copy) return onError("That backup could not be read.");
-    await saveBackup(copy, `${row.name} copy`);
-    refreshLocal();
+    /* Copying the mockup you are working on copies what is on screen, unsaved
+       changes and all, and leaves the row you copied exactly as it stands. */
+    const mine = row.id === linkedId;
+    const source = mine ? project : await readBackup(row.id).catch(() => null);
+    if (!source) return onError("That backup could not be read.");
+
+    setBusy(true);
+    try {
+      /* The working copy is about to be replaced, so it goes somewhere first:
+         into the backup it belongs to, or into one of its own if it belongs to
+         none. Nothing here is ever the last copy of something. */
+      if (!mine) await keepWorkingCopy();
+      const name = freeName(row.name);
+      const id = await saveBackup(source, name);
+      const copy = await readBackup(id);
+      if (!copy) throw new Error("the copy could not be read back");
+      refreshLocal();
+      /* And a key of its own for the cloud. The slug is what a cloud backup is
+         written under, so a duplicate that kept it would push over the row the
+         original had pushed — two documents landing on one. */
+      onLoad(copy, ID.mockup());
+      onLink?.(id);
+      onNotify(`Editing “${name}”. “${row.name}” is untouched.`);
+    } catch {
+      onError("Could not write the backup. Browser storage may be full.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   /* Every row is one somebody made. The `auto` ones are gone; anything left
@@ -360,7 +437,30 @@ export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink,
   const named = (rows ?? []).filter((r) => !r.auto);
   const hit = (r) => r.name.toLowerCase().includes(query.trim().toLowerCase());
   const shownNamed = query.trim() ? named.filter(hit) : named;
-  const exact = named.some((r) => r.name.toLowerCase() === query.trim().toLowerCase());
+
+  /* The name Create backup would actually use — which is the name the
+     already-exists guard has to be about.
+     It used to compare the *typed* text against the list. With the field
+     empty, which is the state it sits in, nothing ever matched, so the button
+     stayed live and every press made one more row with the same name as the
+     last. Four presses, four rows called “Untitled mockup”, no way to tell
+     which was which. */
+  const wanted = (query.trim() || project.name || "").trim();
+  const exact = named.some((r) => r.name.toLowerCase() === wanted.toLowerCase());
+
+  /* “Welcome copy”, then “Welcome copy 2”. Two rows with one name between them
+     is a list you cannot read, and the point of duplicating is to end up with
+     two things you can tell apart.
+     The trailing "copy" comes off the name first, so duplicating a duplicate
+     numbers it rather than stacking the word — "Welcome copy copy copy" says
+     nothing about which one it is. */
+  const freeName = (row) => {
+    const base = row.replace(/ copy(?: \d+)?$/i, "") || row;
+    const taken = new Set(named.map((r) => r.name.toLowerCase()));
+    let name = `${base} copy`;
+    for (let n = 2; taken.has(name.toLowerCase()); n += 1) name = `${base} copy ${n}`;
+    return name.slice(0, NAME_MAX);
+  };
 
   return (
     <div className="b-root">
@@ -448,7 +548,11 @@ export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink,
             className="e-btn e-btn-solid"
             onClick={createNamed}
             disabled={busy || exact}
-            title={exact ? "A backup already has that name" : undefined}
+            title={
+              exact
+                ? `“${wanted}” is already a backup. Open it to carry on with it, or type a different name here.`
+                : undefined
+            }
           >
             <IconPlus size={15} /> Create backup
           </button>
