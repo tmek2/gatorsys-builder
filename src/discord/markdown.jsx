@@ -142,6 +142,59 @@ function resolveUser(users, key) {
   return users.find((u) => u.id === key) ?? users.find((u) => u.name === key) ?? null;
 }
 
+/* A plain `@Name`, resolved against the members and roles this mockup has.
+ *
+ * `<@123>` is what a real message carries, because the client rewrites the
+ * name into an id as you pick it off the autocomplete. Nobody types that, and
+ * in a mockup there are no ids to type — so "@Alex Strike 1, don't do that
+ * again" came out as grey prose with no pill on it, which is not what anybody
+ * writing that sentence meant.
+ *
+ * Longest name first, because a member called "Alex" and a member called
+ * "Alex Strike 1" both match the start of the same text and only the longer
+ * one is the right answer. Names may hold spaces — they are display names —
+ * so this cannot be a word-boundary regex; it is a match against the list of
+ * names that actually exist, which is also the only way to know where the
+ * name stops.
+ */
+function atName(rest, ctx) {
+  const named = [
+    ...(ctx.users ?? []).map((u) => ({ name: u.name, role: false })),
+    ...(ctx.roles ?? []).map((r) => ({ name: r.name, role: true, color: r.color })),
+  ].filter((n) => n.name);
+
+  let best = null;
+  for (const one of named) {
+    if (one.name.length <= (best?.name.length ?? 0)) continue;
+    if (rest.slice(1, 1 + one.name.length).toLowerCase() === one.name.toLowerCase()) best = one;
+  }
+  if (!best) return null;
+
+  return {
+    length: 1 + best.name.length,
+    node: (
+      <span
+        className={`dc-mention${best.role ? " dc-mention-role" : ""}`}
+        style={best.role && best.color && best.color !== "none" ? { "--dc-role": best.color } : undefined}
+      >
+        @{best.name}
+      </span>
+    ),
+  };
+}
+
+/* Whether a message pings somebody, which is what decides the wash down its
+   row. The angle-bracket forms, the two broadcasts, and a plain name that
+   resolves — the same three things the renderer draws as a mention. */
+export function mentionsSomebody(text, ctx) {
+  if (typeof text !== "string" || !text) return false;
+  if (/<@[!&]?[^>]+>/.test(text) || /@(everyone|here)\b/.test(text)) return true;
+  for (let i = text.indexOf("@"); i !== -1; i = text.indexOf("@", i + 1)) {
+    if (atName(text.slice(i), ctx)) return true;
+  }
+  return false;
+}
+
 function inline(text, ctx, keyBase, big) {
   const out = [];
   let rest = text;
@@ -159,6 +212,19 @@ function inline(text, ctx, keyBase, big) {
   };
 
   while (rest) {
+    /* Before the rules, because no regex can know the member list and a
+       display name can hold spaces. `@everyone` and `@here` fall through to
+       their own rule below — nobody is called either. */
+    if (rest[0] === "@") {
+      const named = atName(rest, ctx);
+      if (named) {
+        flush();
+        push(named.node);
+        rest = rest.slice(named.length);
+        continue;
+      }
+    }
+
     let matched = false;
 
     for (const rule of INLINE) {

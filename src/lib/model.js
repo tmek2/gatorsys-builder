@@ -265,6 +265,10 @@ export const newMessage = (user, over = {}) => ({
   /** "Only you can see this" — the footer on an interaction response. */
   ephemeral: false,
   tts: false,
+  /** The ping wash down the row. Default on, and only drawn when the message
+   *  actually mentions somebody; false suppresses it for a message that
+   *  mentions a third party rather than the reader. */
+  ping: true,
   /** The message this one is a reply to, by id. */
   reply: "",
   /** The slash command header: "Name used /command". */

@@ -3072,3 +3072,46 @@ ol.dc-list {
 .dc-profile-role-dot-live:hover {
   box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 25%, transparent);
 }
+
+/* --------------------------------------------------------------- pinged */
+
+/* A message that mentions somebody.
+ *
+ * The client washes the row in its accent and puts a bar in the gutter, and
+ * that pair is most of what makes a screenshot of a ping read as a ping. The
+ * selection treatment above borrows the same vocabulary in Gator's colour
+ * because being picked is a fact about the editor; this one is the mockup, so
+ * it is Discord's own. */
+.dc-pinged {
+  background: var(--background-mentioned, rgba(240, 178, 50, 0.1));
+}
+@media (hover: hover) {
+  .dc-pinged:not(.dc-selected):hover {
+    background: var(--background-mentioned-hover, rgba(240, 178, 50, 0.16));
+  }
+}
+.dc-pinged::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  background: var(--info-warning-foreground, #f0b232);
+}
+/* Being picked is the editor talking and it wins: two washes over one row is
+   a colour neither of them is. */
+.dc-pinged.dc-selected {
+  background: color-mix(in srgb, var(--g-accent) 13%, transparent);
+}
+
+/* A role mention carries the role's own colour, the way the client tints one
+   from the role rather than from the theme. */
+.dc-mention-role {
+  background: color-mix(in srgb, var(--dc-role, var(--mention-foreground)) 16%, transparent);
+  color: var(--dc-role, var(--mention-foreground));
+}
+.dc-mention-role:hover {
+  background: color-mix(in srgb, var(--dc-role, var(--mention-foreground)) 90%, #000);
+  color: #fff;
+}

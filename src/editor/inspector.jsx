@@ -243,6 +243,15 @@ function ContentTab({ message, patch, project, commit, onManageMembers, onError 
             onChange={(v) => patch({ ephemeral: v })}
           />
           <Toggle label="Text to speech" value={message.tts} onChange={(v) => patch({ tts: v })} />
+          {/* On by itself whenever the message mentions somebody, because that
+              is the whole point of drawing one. Off is for the mockup of two
+              other people talking, where the reader was never pinged. */}
+          <Toggle
+            label="Highlight as a ping"
+            hint="The wash and the gutter bar the client puts on a message that mentions you. Drawn by itself whenever this message mentions somebody."
+            value={message.ping !== false}
+            onChange={(v) => patch({ ping: v })}
+          />
         </Group>
       )}
 

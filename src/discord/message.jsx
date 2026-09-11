@@ -14,7 +14,7 @@
  */
 
 import { memo, useContext, useRef, useState } from "react";
-import { Markdown } from "./markdown";
+import { Markdown, mentionsSomebody } from "./markdown";
 import { RenderContext } from "./context";
 import { Embed } from "./embed";
 import { Blocks } from "./components";
@@ -271,6 +271,17 @@ function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, 
   }
 
   const target = message.reply ? replyTo : null;
+  /* The wash down a pinged row.
+   *
+   * The client paints a message that mentions you in the accent with a bar in
+   * the gutter, and that is most of what makes a screenshot of a ping read as
+   * a ping — without it "@Alex Strike 1, don't do that again" is grey prose.
+   * There is no reader of a mockup to be the "you", so the rule here is the
+   * nearest honest one: a message that mentions somebody is a message someone
+   * was pinged by. `ping: false` turns it off for the message that is about
+   * two other people talking. */
+  const pinged =
+    message.ping !== false && mentionsSomebody(message.content, { users, roles });
   /* A grouped message loses its avatar and its author line, but never its
      reply line or its command header: both of those force it out of the
      group in the client, so a grouped message that has one is drawn full. */
@@ -280,7 +291,7 @@ function MessageRow({ message, replyTo, selected, onSelect, dragHandlers, held, 
     <article
       className={`dc-message${grouped ? " dc-grouped" : ""}${selected ? " dc-selected" : ""}${
         message.ephemeral ? " dc-ephemeral" : ""
-      }${message.pinned ? " dc-pinned" : ""}`}
+      }${message.pinned ? " dc-pinned" : ""}${pinged ? " dc-pinged" : ""}`}
       onContextMenu={onMenu}
       data-held={held ? "true" : undefined}
       data-landing={landing ? "true" : undefined}
