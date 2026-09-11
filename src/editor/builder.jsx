@@ -26,6 +26,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   IconArrowBackUp,
   IconArrowForwardUp,
+  IconAlertTriangle,
   IconCheck,
   IconChevronDown,
   IconCloud,
@@ -60,8 +61,9 @@ import { PHONE_HEIGHT, PHONE_WIDTH, blankProject, untouched, newAttachment, newG
 import { nextStamp, restamp } from "@/lib/clock";
 import { TEMPLATES } from "@/lib/templates";
 import { SUPPORT_URL } from "@/lib/site";
-import { loadValue, saveValue } from "@/lib/storage";
+import { exchangeValue, loadValue, saveValue } from "@/lib/storage";
 import { saveBackup, updateBackup } from "@/lib/backups";
+import { TAB, announce, onAnnounce } from "@/lib/tabs";
 import { migrate, validProject } from "@/lib/validate";
 import { Hint, Pick } from "./fields";
 import { Composer } from "./composer";
@@ -100,6 +102,15 @@ const SLUG_KEY = "slug";
    panel: a linked mockup is one where "Save" means "update that backup"
    rather than "make yet another one". */
 const LINK_KEY = "backupLink";
+/* Who wrote the working copy last, and how many times it has been written.
+ *
+ * One slot, any number of tabs. Without this a tab left open on an older
+ * document writes it over a newer one the moment anybody types in it — the
+ * keystroke is a state change, the state change is a save, and the save knows
+ * nothing about the tab that has been working all morning. The counter is
+ * read and raised inside one transaction, so of two tabs racing exactly one
+ * can win, and the loser finds out rather than guessing. */
+const STAMP_KEY = "workingCopyStamp";
 
 export function Builder({ user, canSignIn = true, shared = null }) {
   const [project, setProject] = useState(blankProject);
@@ -129,6 +140,20 @@ export function Builder({ user, canSignIn = true, shared = null }) {
   const [toast, setToast] = useState(null);
   const [loaded, setLoaded] = useState(false);
   const [savedLocally, setSavedLocally] = useState(true);
+  /* The stamp this tab last agreed with, and what it last put in the working
+     copy. Refs rather than state: both are read inside the save, and neither
+     is anything to redraw over. */
+  const seen = useRef(0);
+  const written = useRef(null);
+  /* Set when another tab has written the working copy and this one has changes
+     of its own that would be lost by catching up. Saving here stops until it
+     is answered, because a save at that point is the overwrite. */
+  const [clash, setClash] = useState(null);
+  /* What is on screen right now, for the listeners below. They are bound once
+     — a BroadcastChannel opened and closed on every keystroke is not a
+     subscription, it is a leak with a heartbeat — so they cannot close over
+     state and have to read it. */
+  const live = useRef(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   /* How far the animated export has got, 0 to 1, or null when none is
@@ -179,6 +204,8 @@ export function Builder({ user, canSignIn = true, shared = null }) {
   const scroller = useRef(null);
   const [room, setRoom] = useState(0);
 
+  live.current = { project, slug, linkedId, clash };
+
   const notify = useCallback(
     (text, tone = "ok") => setToast({ text, tone, key: uid() }),
     [],
@@ -220,14 +247,25 @@ export function Builder({ user, canSignIn = true, shared = null }) {
       };
     }
 
-    Promise.all([loadValue(STORE_KEY), loadValue(SLUG_KEY), loadValue(LINK_KEY)])
-      .then(([saved, savedSlug, savedLink]) => {
+    Promise.all([loadValue(STORE_KEY), loadValue(SLUG_KEY), loadValue(LINK_KEY), loadValue(STAMP_KEY)])
+      .then(([saved, savedSlug, savedLink, stamp]) => {
         if (!alive) return;
+        /* Where the working copy had got to when this tab opened. Writing is
+           allowed from here on only while nothing else has moved it. */
+        seen.current = stamp?.seq ?? 0;
         const next = migrate(saved);
         if (validProject(next)) {
           setProject(next);
           if (typeof savedSlug === "string") setSlug(savedSlug);
           if (typeof savedLink === "string") setLinkedId(savedLink);
+          /* What was read is not something to write back. Without this the
+             first save after opening a second tab is a save of what is already
+             there, which raises the stamp and picks a fight over nothing. */
+          written.current = {
+            project: next,
+            slug: typeof savedSlug === "string" ? savedSlug : null,
+            linkedId: typeof savedLink === "string" ? savedLink : null,
+          };
         }
       })
       .catch(() => {
@@ -255,14 +293,108 @@ export function Builder({ user, canSignIn = true, shared = null }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loaded]);
 
+  /* ------------------------------------------------- the working copy ---- */
+
+  /* Writing it, if this tab is still the one entitled to.
+   *
+   * The stamp is raised first and inside its own transaction, so of two tabs
+   * saving at once exactly one gets through; the loser is handed what it found
+   * instead of writing anyway. Raised *before* the document rather than after,
+   * because a tab that reads a new stamp beside an old document decides it is
+   * behind and holds off, which costs a question — while the other order has
+   * it decide it is up to date and write, which costs the work. */
+  const writeWorkingCopy = useCallback(async (mine) => {
+    const stamp = await exchangeValue(STAMP_KEY, (had) => {
+      const at = had?.seq ?? 0;
+      if (at !== seen.current) return undefined;
+      return { writer: TAB, seq: at + 1, at: Date.now() };
+    });
+    if (!stamp.wrote) return stamp.had ?? { seq: 0 };
+    seen.current = stamp.value.seq;
+    written.current = mine;
+    await Promise.all([
+      saveValue(STORE_KEY, mine.project),
+      saveValue(SLUG_KEY, mine.slug),
+      saveValue(LINK_KEY, mine.linkedId),
+    ]);
+    announce(stamp.value.seq);
+    return null;
+  }, []);
+
+  /* Catching up with what another tab wrote. */
+  const adopt = useCallback(async () => {
+    const [saved, savedSlug, savedLink, stamp] = await Promise.all([
+      loadValue(STORE_KEY),
+      loadValue(SLUG_KEY),
+      loadValue(LINK_KEY),
+      loadValue(STAMP_KEY),
+    ]);
+    const next = migrate(saved);
+    if (!validProject(next)) return false;
+    const nextSlug = typeof savedSlug === "string" ? savedSlug : live.current.slug;
+    const nextLink = typeof savedLink === "string" ? savedLink : null;
+    seen.current = stamp?.seq ?? 0;
+    written.current = { project: next, slug: nextSlug, linkedId: nextLink };
+    setProject(next);
+    setSlug(nextSlug);
+    setLinkedId(nextLink);
+    /* The history belongs to the document that was here. Undo across the
+       boundary would walk back into a mockup this tab no longer holds. */
+    setPast([]);
+    setFuture([]);
+    setSelected(next.messages[0]?.id ?? null);
+    setSavedLocally(true);
+    return true;
+  }, []);
+
+  /* Is there anything here that catching up would lose? */
+  const nothingToLose = useCallback(() => {
+    const now = live.current;
+    const ours = written.current;
+    if (
+      ours &&
+      ours.project === now.project &&
+      ours.slug === now.slug &&
+      ours.linkedId === now.linkedId
+    )
+      return true;
+    return untouched(now.project);
+  }, []);
+
   /* Autosave. Debounced, because a keystroke is a state change and writing
      the whole project on every one of them is a transaction per character. */
   useEffect(() => {
     if (!loaded) return undefined;
+    /* Already there. This is what was last written, or what was just taken
+       from another tab — and writing it back would raise the stamp, which the
+       other tab would answer by taking it back, for ever. */
+    if (
+      written.current &&
+      written.current.project === project &&
+      written.current.slug === slug &&
+      written.current.linkedId === linkedId
+    ) {
+      setSavedLocally(true);
+      return undefined;
+    }
+    /* Frozen until somebody says which version survives. Saving now is the
+       overwrite the question is about. */
+    if (clash) return undefined;
+
     setSavedLocally(false);
     const timer = window.setTimeout(() => {
-      Promise.all([saveValue(STORE_KEY, project), saveValue(SLUG_KEY, slug), saveValue(LINK_KEY, linkedId)])
-        .then(() => setSavedLocally(true))
+      writeWorkingCopy({ project, slug, linkedId })
+        .then(async (lost) => {
+          if (!lost) {
+            setSavedLocally(true);
+            return;
+          }
+          /* Another tab got there first. If there is nothing here worth
+             keeping — an untouched page, or one that has not changed since it
+             was last written — catch up rather than ask. */
+          if (nothingToLose() && (await adopt())) return;
+          setClash({ seq: lost.seq ?? 0 });
+        })
         .catch(() =>
           fail(
             "Browser storage is full. Download the project file to keep your changes.",
@@ -270,7 +402,87 @@ export function Builder({ user, canSignIn = true, shared = null }) {
         );
     }, 500);
     return () => window.clearTimeout(timer);
-  }, [project, slug, linkedId, loaded, fail]);
+  }, [project, slug, linkedId, loaded, clash, adopt, nothingToLose, writeWorkingCopy, fail]);
+
+  /* Another tab wrote. Bound once, for the life of the editor.
+   *
+   * A tab with nothing of its own catches up the moment it hears, so that by
+   * the time anybody types in it, it is already on the current document and
+   * there is nothing to argue about. One with its own changes is left alone —
+   * it finds out when it tries to save, which is the point at which there is
+   * something to decide. */
+  useEffect(() => {
+    if (!loaded) return undefined;
+    return onAnnounce((seq) => {
+      if (seq <= seen.current || live.current.clash || !nothingToLose()) return;
+      adopt().then((took) => {
+        if (took) notify("Caught up with another tab.");
+      });
+    });
+  }, [adopt, loaded, nothingToLose, notify]);
+
+  /* And when a tab comes back to the front.
+   *
+   * A message can be missed — a browser without BroadcastChannel, a tab that
+   * was asleep — and coming back to a tab you left open yesterday is exactly
+   * when this matters. */
+  useEffect(() => {
+    if (!loaded) return undefined;
+    const look = async () => {
+      if (document.visibilityState !== "visible" || live.current.clash) return;
+      const stamp = await loadValue(STAMP_KEY).catch(() => null);
+      if (!stamp || (stamp.seq ?? 0) <= seen.current) return;
+      if (!nothingToLose()) {
+        setClash({ seq: stamp.seq });
+        return;
+      }
+      if (await adopt()) notify("Caught up with another tab.");
+    };
+    document.addEventListener("visibilitychange", look);
+    return () => document.removeEventListener("visibilitychange", look);
+  }, [adopt, loaded, nothingToLose, notify]);
+
+  /* The two ways out, and neither of them loses a document.
+   *
+   * Somebody choosing here is choosing which version to carry on in, not
+   * agreeing to throw the other one away — so the one not chosen goes to
+   * Backups either way, named for the tab it came from. */
+  const keepMine = useCallback(async () => {
+    const theirs = migrate(await loadValue(STORE_KEY).catch(() => null));
+    if (validProject(theirs) && !untouched(theirs))
+      await saveBackup(theirs, `${theirs.name} (other tab)`).catch(() => {});
+    /* Take the stamp as it stands rather than as this tab last saw it: taking
+       over is the whole of what was asked for. */
+    const stamp = await exchangeValue(STAMP_KEY, (had) => ({
+      writer: TAB,
+      seq: (had?.seq ?? 0) + 1,
+      at: Date.now(),
+    }));
+    const now = live.current;
+    seen.current = stamp.value.seq;
+    written.current = { project: now.project, slug: now.slug, linkedId: now.linkedId };
+    await Promise.all([
+      saveValue(STORE_KEY, now.project),
+      saveValue(SLUG_KEY, now.slug),
+      saveValue(LINK_KEY, now.linkedId),
+    ]);
+    announce(stamp.value.seq);
+    setClash(null);
+    setSavedLocally(true);
+    notify("Saving here again. The other tab's version is in Backups.");
+  }, [notify]);
+
+  const takeTheirs = useCallback(async () => {
+    const mine = live.current.project;
+    if (!untouched(mine)) await saveBackup(mine, `${mine.name} (this tab)`).catch(() => {});
+    const took = await adopt();
+    setClash(null);
+    notify(
+      took
+        ? "Caught up with the other tab. What was here is in Backups."
+        : "There was nothing newer to catch up with.",
+    );
+  }, [adopt, notify]);
 
   /* No automatic snapshots.
      There was a timer taking one every ninety seconds and keeping the last
@@ -1284,6 +1496,28 @@ export function Builder({ user, canSignIn = true, shared = null }) {
         tabIndex={-1}
         onChange={importFile}
       />
+
+      {/* Two tabs, one working copy. Loud, and where the work is, because a
+          toast that fades after four seconds is not how you tell somebody
+          that nothing they type is being kept. */}
+      {clash ? (
+        <div className="e-clash e-no-export" role="alert">
+          <IconAlertTriangle size={17} />
+          <span className="e-clash-copy">
+            <strong>This mockup is open in another tab.</strong> That tab has saved newer
+            changes, so nothing you do here is being kept. Whichever you pick, the other
+            version goes to Backups.
+          </span>
+          <span className="e-clash-actions">
+            <button type="button" className="e-btn e-btn-solid" onClick={keepMine}>
+              Keep this tab&rsquo;s
+            </button>
+            <button type="button" className="e-btn e-btn-quiet" onClick={takeTheirs}>
+              Use the newer one
+            </button>
+          </span>
+        </div>
+      ) : null}
       <SiteNav
         user={user}
         canSignIn={canSignIn}
@@ -1304,21 +1538,25 @@ export function Builder({ user, canSignIn = true, shared = null }) {
             </Hint>
             <Hint
               label={
-                savedLocally
-                  ? "Kept in this browser and restored when you come back"
-                  : "Writing to this browser"
+                clash
+                  ? "Another tab has this mockup open and has saved newer changes"
+                  : savedLocally
+                    ? "Kept in this browser and restored when you come back"
+                    : "Writing to this browser"
               }
             >
               <span
                 className="e-save"
-                data-saved={savedLocally ? "true" : "false"}
+                data-saved={clash ? "clash" : savedLocally ? "true" : "false"}
               >
-                {savedLocally ? (
+                {clash ? (
+                  <IconAlertTriangle size={13} />
+                ) : savedLocally ? (
                   <IconCheck size={13} />
                 ) : (
                   <IconDeviceFloppy size={13} />
                 )}
-                {savedLocally ? "Saved" : "Saving…"}
+                {clash ? "Not saving" : savedLocally ? "Saved" : "Saving…"}
               </span>
             </Hint>
             {/* Next to the save state rather than out in the action cluster.

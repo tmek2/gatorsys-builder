@@ -93,6 +93,11 @@
 .e-save[data-saved="true"] {
   color: var(--g-gator);
 }
+/* Not "Saving…" with a spinner that never lands. Writing has stopped, and the
+   chip that has been saying "Saved" all session is the thing somebody checks. */
+.e-save[data-saved="clash"] {
+  color: #ffb4bf;
+}
 
 /* Reads as part of the save state it sits beside rather than as a fifth
    toolbar button: no fill until it is pointed at, and the same small type. */
@@ -1260,4 +1265,53 @@
   clip-path: inset(50%);
   white-space: nowrap;
   border: 0;
+}
+
+/* Two tabs, one working copy.
+ *
+ * Across the top, above everything, and it stays until it is answered. The
+ * editor's other notices are toasts because they are news; this is a state —
+ * nothing typed is being kept — and a state that clears itself after four
+ * seconds is one nobody finds out about until the work is gone. */
+.e-clash {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid color-mix(in srgb, #e0566a 55%, transparent);
+  background: color-mix(in srgb, #e0566a 16%, var(--g-sheet-ground));
+  color: var(--g-ink);
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.e-clash > svg {
+  flex: none;
+  color: #ffb4bf;
+}
+.e-clash-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.e-clash-copy strong {
+  font-weight: 700;
+}
+.e-clash-actions {
+  display: flex;
+  flex: none;
+  gap: 8px;
+}
+
+/* On a phone the two buttons go under the words rather than squeezing them
+   into a column two syllables wide. */
+@media (max-width: 720px) {
+  .e-clash {
+    flex-wrap: wrap;
+  }
+  .e-clash-actions {
+    width: 100%;
+  }
+  .e-clash-actions .e-btn {
+    flex: 1 1 0;
+    justify-content: center;
+  }
 }
