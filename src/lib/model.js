@@ -440,6 +440,38 @@ export function blankProject() {
   };
 }
 
+/* Is this still the page the editor opens on?
+ *
+ * Asked before anything replaces the working copy. Opening a backup, starting
+ * a new mockup and duplicating a different one all swap out what is on screen,
+ * and what is on screen is where everything typed since the last Save lives —
+ * so it is kept first. Except when there is nothing there: backing up the
+ * blank page would put a row called "Untitled mockup" in the list every time
+ * somebody clicked a backup, and a list of those is worse than no list.
+ *
+ * Every id in `blankProject` is fixed, so this is a comparison rather than a
+ * heuristic about which fields count as content. */
+export function untouched(project) {
+  /* Key order is not content. A project that has been through `migrate` can
+     carry the same fields written in a different order, and comparing the raw
+     JSON of that against a fresh blank says "different" about two things that
+     are the same page. */
+  const stable = (value) => {
+    if (Array.isArray(value)) return value.map(stable);
+    if (value && typeof value === "object")
+      return Object.fromEntries(Object.keys(value).sort().map((k) => [k, stable(value[k])]));
+    return value;
+  };
+  const strip = (p) => JSON.stringify(stable({ ...p, name: "", updatedAt: 0 }));
+  try {
+    return strip(project) === strip(blankProject());
+  } catch {
+    /* Something unserialisable in there means somebody has been working in
+       it. Keep it. */
+    return false;
+  }
+}
+
 /* --------------------------------------------------------------- helpers */
 
 /** Every block in a tree, flattened, so a count or a search does not have to

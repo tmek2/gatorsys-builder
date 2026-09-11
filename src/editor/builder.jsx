@@ -56,12 +56,12 @@ import { SiteNav } from "@/gator/site-nav";
 import { ThemeToggle } from "@/gator/theme-toggle";
 import { DiscordSurface } from "@/discord/surface";
 import { avatarUrl } from "@/lib/avatars";
-import { PHONE_HEIGHT, PHONE_WIDTH, blankProject, newAttachment, newGift, newMessage, newRole, newUser, reid, uid } from "@/lib/model";
+import { PHONE_HEIGHT, PHONE_WIDTH, blankProject, untouched, newAttachment, newGift, newMessage, newRole, newUser, reid, uid } from "@/lib/model";
 import { nextStamp, restamp } from "@/lib/clock";
 import { TEMPLATES } from "@/lib/templates";
 import { SUPPORT_URL } from "@/lib/site";
 import { loadValue, saveValue } from "@/lib/storage";
-import { saveBackup } from "@/lib/backups";
+import { saveBackup, updateBackup } from "@/lib/backups";
 import { migrate, validProject } from "@/lib/validate";
 import { Hint, Pick } from "./fields";
 import { Composer } from "./composer";
@@ -1077,30 +1077,49 @@ export function Builder({ user, canSignIn = true, shared = null }) {
     }
   }, [fail, notify, project]);
 
+  /* Everything that replaces what is on the canvas goes through here.
+   *
+   * New mockup, a template, the empty tile: each throws the working copy away,
+   * and the working copy is where everything typed since the last Save lives.
+   * Being linked to a backup used to count as already kept, which is only true
+   * of the last Save — so "new" quietly deleted whatever came after it. A link
+   * says which backup this is, not that it is current, so the link is written
+   * to rather than trusted.
+   *
+   * And if it cannot be written, nothing is replaced. A blank page is not
+   * worth the thing it would be written over. */
+  const startFresh = useCallback(
+    async (next, said) => {
+      const was = project.name;
+      /* Nothing there is nothing to keep: backing up the page the editor opens
+         on would put an "Untitled mockup" in the list every time somebody
+         pressed New. */
+      const blank = untouched(project);
+      if (!blank) {
+        const kept = await (linkedId ? updateBackup(linkedId, project) : saveBackup(project))
+          .then(() => true)
+          .catch(() => false);
+        if (!kept) {
+          fail(
+            `\u201c${was}\u201d could not be backed up, so it is still here. Download the project file before starting something new.`,
+          );
+          return;
+        }
+      }
+      load(next, ID.mockup());
+      setLinkedId(null);
+      setSheetOpen(null);
+      notify(blank ? said : `${said} \u201c${was}\u201d is in Backups.`);
+    },
+    [fail, linkedId, load, notify, project],
+  );
+
   /* A blank page to start again on.
    *
    * There was an "Empty" tile at the bottom of the templates sheet and nothing
    * else, which is not where anybody looks for "new" — reported as not having
-   * the option at all. It is a button now, in the bar and in the menus.
-   *
-   * And it keeps what is on screen. Every change is written to the working
-   * copy as it is made, so starting fresh without this would throw away
-   * whatever was there with no undo across the boundary — the thing somebody
-   * pressing "new" is least expecting. A mockup that is already a named backup
-   * is already kept, so that one is left alone. */
-  const newMockup = useCallback(async () => {
-    let kept = false;
-    if (!linkedId) {
-      kept = await saveBackup(project).then(() => true).catch(() => false);
-    }
-    load(blankProject(), ID.mockup());
-    setLinkedId(null);
-    notify(
-      kept
-        ? `New mockup. \u201c${project.name}\u201d is in Backups.`
-        : "New mockup.",
-    );
-  }, [linkedId, load, notify, project]);
+   * the option at all. It is a button now, in the bar and in the menus. */
+  const newMockup = useCallback(() => startFresh(blankProject(), "New mockup."), [startFresh]);
 
   const doShare = useCallback(async () => {
     const { url, kind, error } = await shareLink(project);
@@ -1130,9 +1149,23 @@ export function Builder({ user, canSignIn = true, shared = null }) {
     }
   }, [fail, message, notify]);
 
+  /* The file coming back in.
+   *
+   * This handler has been here all along with nothing attached to it: the
+   * input it reads an event from was never put on the page, so Backups' own
+   * "Import a file" button clicked a ref holding null and the whole way back
+   * in was shut. A tool that hands you a project file and then will not take
+   * it back can strand your work on your own disk — and "download the project
+   * file" is the advice every storage failure in here gives.
+   *
+   * Forked on the way in, so nothing in somebody else's document shares an id
+   * with a backup already in this browser, and through `startFresh` like every
+   * other thing that replaces the canvas, so what was open is kept first. */
   const importFile = useCallback(
     async (event) => {
       const file = event.target.files?.[0];
+      /* Cleared so that picking the same file twice running still counts as a
+         change and still opens it. */
       event.target.value = "";
       if (!file) return;
       if (file.size > 24 * 1024 * 1024) {
@@ -1140,13 +1173,14 @@ export function Builder({ user, canSignIn = true, shared = null }) {
         return;
       }
       try {
-        load(JSON.parse(await file.text()), null, { detach: true });
-        notify("Project imported as your own copy.");
+        const next = migrate(JSON.parse(await file.text()));
+        if (!validProject(next)) throw new Error("not a mockup");
+        await startFresh(forkProject(next), `Opened \u201c${next.name}\u201d as your own copy.`);
       } catch {
         fail("That file could not be read as a mockup.");
       }
     },
-    [fail, load, notify],
+    [fail, startFresh],
   );
 
   /* ---------------------------------------------------------- gestures */
@@ -1238,6 +1272,18 @@ export function Builder({ user, canSignIn = true, shared = null }) {
 
   return (
     <div className="e-app">
+      {/* Offscreen, because a file input is the only way to open a file
+          picker and the one the browser draws is not a control this bar
+          would have. Backups' "Import a file" presses it. */}
+      <input
+        ref={importer}
+        type="file"
+        accept="application/json,.json"
+        className="e-file-hidden"
+        aria-hidden="true"
+        tabIndex={-1}
+        onChange={importFile}
+      />
       <SiteNav
         user={user}
         canSignIn={canSignIn}
@@ -1851,12 +1897,7 @@ export function Builder({ user, canSignIn = true, shared = null }) {
               <button
                 type="button"
                 className="e-template"
-                onClick={() => {
-                  load(template.build(), ID.mockup());
-      setLinkedId(null);
-                  setSheetOpen(null);
-                  notify(`Opened \u201c${template.name}\u201d.`);
-                }}
+                onClick={() => startFresh(template.build(), `Opened \u201c${template.name}\u201d.`)}
               >
                 <span className="e-template-name">{template.name}</span>
                 <span className="e-template-hint">{template.hint}</span>
@@ -1867,11 +1908,7 @@ export function Builder({ user, canSignIn = true, shared = null }) {
             <button
               type="button"
               className="e-template"
-              onClick={() => {
-                load(blankProject(), ID.mockup());
-                setLinkedId(null);
-                setSheetOpen(null);
-              }}
+              onClick={newMockup}
             >
               <span className="e-template-name">Empty</span>
               <span className="e-template-hint">
@@ -1937,6 +1974,7 @@ export function Builder({ user, canSignIn = true, shared = null }) {
           slug={slug}
           linkedId={linkedId}
           onLink={setLinkedId}
+          onRenameProject={(name) => commit((p) => ({ ...p, name }))}
           user={user}
           canSignIn={canSignIn}
           savedLocally={savedLocally}

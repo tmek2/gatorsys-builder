@@ -1,13 +1,20 @@
 /* The shape of text that is not there yet.
  *
- * A block somebody has just added, or cleared, draws nothing at all — and a
- * container with an empty text block in it looks like a container with a bug
- * in it rather than one waiting for words. The client draws an embed it has
- * not filled in yet as grey bars, so that is what empty looks like here too.
+ * The client draws an embed it has not filled in yet as grey bars — it is a
+ * real state of a real Discord message, the one you see for the moment a link
+ * is unfurling — so that is what empty looks like here too.
  *
- * Editor only: every one of these carries `e-no-export`, so a mockup with an
- * unfinished block in it exports as though the block were simply absent rather
- * than exporting a picture of scaffolding.
+ * And it is part of the picture, not editor chrome. It was built the other way
+ * round, carrying `e-no-export` on the reasoning that an unfinished block is
+ * scaffolding somebody forgot about. That was wrong twice over: it broke the
+ * one promise this editor makes, which is that the canvas is the picture, and
+ * it took away the drawing somebody wanted — a template with its text
+ * positions marked out is a thing people make on purpose, and it is most of
+ * why an empty embed is worth having at all.
+ *
+ * What is genuinely scaffolding still carries the flag: the dashed "Add an
+ * image" plate, the hover strip over a picture. Those say what to press. Bars
+ * say where words go, and a picture of where words go is a picture.
  */
 
 /**
@@ -17,7 +24,7 @@
  */
 export function Ghost({ lines = ["title", "body"] }) {
   return (
-    <span className="dc-ghost e-no-export" aria-hidden="true">
+    <span className="dc-ghost" aria-hidden="true">
       {lines.map((line, i) => (
         <span key={i} className="dc-ghost-line" data-line={line} />
       ))}
