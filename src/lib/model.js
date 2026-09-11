@@ -349,6 +349,20 @@ export const newCanvas = (over = {}) => ({
    * own, because a phone is a fixed piece of hardware.
    */
   height: 800,
+  /* Whether the height above is a ceiling or the height.
+   *
+   * "fit" is the window that hugs its conversation and stops growing at
+   * `height` — right for a mockup of three messages, which should be three
+   * messages tall rather than a tall box with a hole in it.
+   *
+   * "fixed" is a window that is `width` by `height` and stays there whatever
+   * is in it, for when the picture has to come out at a size somebody else
+   * decided: a slide, a store listing, a set of mockups that have to line up.
+   * The messages sit against the bottom, which is where a half-empty channel
+   * puts them in the client, so the empty room reads as a quiet channel
+   * rather than as a gap. Absent means "fit", so nothing already saved
+   * changes shape. */
+  sizing: "fit",
   padding: 24,
   radius: 10,
   scale: 2,

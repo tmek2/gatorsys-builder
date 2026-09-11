@@ -111,6 +111,9 @@ const LINK_KEY = "backupLink";
  * read and raised inside one transaction, so of two tabs racing exactly one
  * can win, and the loser finds out rather than guessing. */
 const STAMP_KEY = "workingCopyStamp";
+/* The composer floats over the foot of the stage rather than sitting under it,
+   so this much of the stage's height is not room a mockup can use. */
+const COMPOSER_ROOM = 96;
 
 export function Builder({ user, canSignIn = true, shared = null }) {
   const [project, setProject] = useState(blankProject);
@@ -203,6 +206,8 @@ export function Builder({ user, canSignIn = true, shared = null }) {
   const importer = useRef(null);
   const scroller = useRef(null);
   const [room, setRoom] = useState(0);
+  /* And how much of the stage is above the composer. */
+  const [headroom, setHeadroom] = useState(0);
 
   live.current = { project, slug, linkedId, clash };
 
@@ -528,7 +533,10 @@ export function Builder({ user, canSignIn = true, shared = null }) {
   useEffect(() => {
     const node = scroller.current;
     if (!node) return undefined;
-    const measure = () => setRoom(node.clientWidth - 64);
+    const measure = () => {
+      setRoom(node.clientWidth - 64);
+      setHeadroom(node.clientHeight - 64 - COMPOSER_ROOM);
+    };
     measure();
     const watch = new ResizeObserver(measure);
     watch.observe(node);
@@ -543,26 +551,39 @@ export function Builder({ user, canSignIn = true, shared = null }) {
    * a scroll container starts at its top-left corner, which with that much
    * slack is a screenful of nothing. So the first paint scrolls to the middle.
    *
-   * Once only: after that the position is the reader's, and re-centring under
-   * them every time the mockup grows a line would fight the drag they just
-   * made. */
+   * Once on opening, and again when the mockup changes shape: after that the
+   * position is the reader's, and re-centring under them every time it grows a
+   * line would fight the drag they just made.
+   *
+   * Changing shape is the exception because it is not a line — switching
+   * between a window that hugs its conversation and one held at a size, or
+   * between the desktop and the phone, moves the thing by hundreds of points,
+   * and with a viewport of slack on every side that means it leaves the
+   * screen. Turning on a set size and being shown the empty room above the
+   * conversation, or nothing at all, reads as the setting having emptied the
+   * mockup. */
   const centred = useRef(false);
+  const shapedAs = useRef(null);
+  const shape = `${project.canvas.platform}:${project.canvas.sizing === "fixed" ? "fixed" : "fit"}`;
   useEffect(() => {
     const node = scroller.current;
-    if (!node || centred.current || !loaded) return;
+    if (!node || !loaded) return undefined;
+    if (centred.current && shapedAs.current === shape) return undefined;
     const centre = () => {
       if (node.scrollWidth <= node.clientWidth) return false;
       node.scrollLeft = (node.scrollWidth - node.clientWidth) / 2;
       node.scrollTop = (node.scrollHeight - node.clientHeight) / 2;
       centred.current = true;
+      shapedAs.current = shape;
       return true;
     };
-    // A frame later, so the plate has been laid out and measured.
+    /* Two frames, because the first is the one the new size is laid out in and
+       the scroll extent is not final until it has been. */
     const id = requestAnimationFrame(() => {
       if (!centre()) requestAnimationFrame(centre);
     });
     return () => cancelAnimationFrame(id);
-  }, [loaded]);
+  }, [loaded, shape]);
 
   /* -------------------------------------------------------------- state */
 
@@ -1408,9 +1429,27 @@ export function Builder({ user, canSignIn = true, shared = null }) {
   });
 
   const phone = project.canvas.platform === "mobile";
+  /* A window held at a size, rather than one that grows with what is in it.
+     See `newCanvas`. Absent means fitting, so every mockup saved before this
+     existed keeps the shape it had. */
+  const fixedSize = project.canvas.sizing === "fixed";
+  /* Across, and — when the height is a number rather than whatever the
+     conversation came to — down as well.
+     Width alone was enough while every mockup hugged its content: a window
+     that fits across fits. A window held at a size does not. Eight hundred
+     points of it in a stage six hundred tall opens showing its empty top half,
+     with the conversation — which sits against the bottom, as it does in the
+     client — below the fold, so turning the setting on looked like it had
+     emptied the mockup. */
   const fit =
     room > 0
-      ? Math.min(1, room / (phone ? PHONE_WIDTH : project.canvas.width))
+      ? Math.min(
+          1,
+          room / (phone ? PHONE_WIDTH : project.canvas.width),
+          ...(fixedSize && headroom > 0
+            ? [headroom / (phone ? PHONE_HEIGHT : project.canvas.height)]
+            : []),
+        )
       : 1;
   const shown = zoomShown * fit;
 
@@ -1844,16 +1883,22 @@ export function Builder({ user, canSignIn = true, shared = null }) {
               <div
                 ref={frame}
                 className={`e-frame${phone ? " e-frame-phone" : ""}`}
+                data-size={fixedSize ? "fixed" : "fit"}
                 style={{
                   /* The phone is a device, not a narrow canvas: its width is the
                    iPhone's, and the width slider does not apply to it. */
                   width: phone ? PHONE_WIDTH : project.canvas.width,
-                  /* A maximum, not a height. Below it the frame hugs its
-                     content, so a three-message mockup is three messages tall
-                     and not a tall box with a hole in it; past it the
-                     conversation scrolls inside and this is the edge the
-                     export stops at. A window has a bottom. */
-                  maxHeight: phone ? PHONE_HEIGHT : project.canvas.height,
+                  /* A ceiling or the height, depending on which of the two
+                     windows this mockup is.
+                     Fitting, the frame hugs its content and stops growing
+                     here, so a three-message mockup is three messages tall
+                     rather than a tall box with a hole in it, and a long one
+                     scrolls inside and exports at this edge. Set, it is this
+                     tall full stop — with the conversation against the bottom,
+                     where the client puts it. */
+                  ...(fixedSize
+                    ? { height: phone ? PHONE_HEIGHT : project.canvas.height }
+                    : { maxHeight: phone ? PHONE_HEIGHT : project.canvas.height }),
                   borderRadius: phone ? 54 : project.canvas.radius,
                   /* `zoom`, not `transform: scale()`. A transform paints the
                    element smaller and leaves its box the original size, so a

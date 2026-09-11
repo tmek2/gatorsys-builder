@@ -126,7 +126,13 @@ export function Num({ value, onChange, min, max, step = 1, suffix }) {
 /* Radix's slider rather than `<input type="range">`, which cannot be styled
    consistently across browsers — Firefox and Safari each draw their own track
    and thumb and ignore most of what you tell them. */
-export function Slider({ value, onChange, min, max, step = 1, suffix = "" }) {
+/* `typed` makes the readout a field you can type in.
+ *
+ * A slider is the right control for "a bit more padding" and the wrong one for
+ * "exactly 1080": at a step of ten across sixteen hundred, hitting a number
+ * somebody else chose is a game rather than a setting. Opt-in, because most of
+ * these are the first kind. */
+export function Slider({ value, onChange, min, max, step = 1, suffix = "", typed = false, label }) {
   return (
     <span className="e-slider">
       <SliderPrimitive.Root
@@ -142,10 +148,31 @@ export function Slider({ value, onChange, min, max, step = 1, suffix = "" }) {
         </SliderPrimitive.Track>
         <SliderPrimitive.Thumb className="block size-[15px] rounded-full border-2 border-[var(--accent-peach)] bg-[var(--gator-surface-raised)] shadow-sm transition-[transform,box-shadow] duration-150 ease-premium hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-peach)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--gator-bg)] active:scale-95" />
       </SliderPrimitive.Root>
-      <output>
-        {value}
-        {suffix}
-      </output>
+      {typed ? (
+        <span className="e-slider-typed">
+          <input
+            type="number"
+            className="e-slider-field"
+            value={value ?? min}
+            min={min}
+            max={max}
+            step={step}
+            aria-label={label}
+            onChange={(event) => {
+              const next = Number(event.target.value);
+              /* An empty field is somebody mid-edit, not a request for zero. */
+              if (event.target.value === "" || !Number.isFinite(next)) return;
+              onChange(Math.min(max, Math.max(min, Math.round(next))));
+            }}
+          />
+          {suffix}
+        </span>
+      ) : (
+        <output>
+          {value}
+          {suffix}
+        </output>
+      )}
     </span>
   );
 }

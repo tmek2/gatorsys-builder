@@ -691,6 +691,16 @@
   flex: none;
   flex-direction: column;
   overflow: hidden;
+  /* The number is about the picture, not about the frame around it.
+   *
+   * The hairline that makes this read as a window is a border, and under the
+   * page's own border-box it came out of the size: a canvas set to 1280 wide
+   * exported 1278, and a height set to 800 exported 798. Nobody minds a
+   * two-point window — somebody lining a row of mockups up at a size a slide
+   * or a store listing asked for does, and that is the whole point of a size
+   * you set. So the border goes outside the number, which is the rule the
+   * phone's bezel a few lines down has always followed. */
+  box-sizing: content-box;
   border: 1px solid var(--mac-hairline);
   box-shadow: var(--mac-lift-high);
   /* Width still eases, because it changes from a control rather than from a
@@ -709,14 +719,15 @@
    content laid out inside them, which is how a message box ended up with its
    corner cut off. */
 .e-frame-phone {
-  /* The one place on this page that is not border-box.
+  /* The bezel, outside the number.
    *
    * The width handed to this element is the iPhone's viewport — 393 — and the
    * panel says so. Under the page's own `border-box` the nine points of bezel
    * came out of that, leaving a 375-point screen: an iPhone SE wearing a 15's
    * label, with every message laid out eighteen points narrower than the
    * client it is imitating. Here the border goes outside the number, which is
-   * what a bezel does on a real phone. */
+   * what a bezel does on a real phone — and it is the rule for the desktop
+   * frame's hairline too now, for the same reason. */
   box-sizing: content-box;
   border: 9px solid #0c0c0e;
   border-radius: 64px !important;
@@ -744,6 +755,12 @@
    width and its corner radius, not by holding a height nothing is filling. */
 .e-frame-phone .dc {
   min-height: 132px;
+}
+/* Neither floor applies to a window held at a size: the frame has a height,
+   the surface fills it, and a minimum underneath would only be something for
+   the two to disagree about. */
+.e-frame[data-size="fixed"] .dc {
+  min-height: 0;
 }
 
 /* --------------------------------------------------------------- right */

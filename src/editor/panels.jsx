@@ -390,6 +390,9 @@ export function CanvasPanel({ project, commit, onError, focus }) {
       (p) => ({ ...p, canvas: { ...p.canvas, [key]: { ...p.canvas[key], ...over } } }),
       `canvas:${key}:${Object.keys(over).sort().join(",")}`,
     );
+  /* Absent means fitting, so a mockup saved before this control existed reads
+     as the window it has always been. */
+  const fixed = canvas.sizing === "fixed";
 
   return (
     <>
@@ -399,35 +402,80 @@ export function CanvasPanel({ project, commit, onError, focus }) {
           as themselves now. This sheet is what is left: the things you set
           once and stop thinking about. */}
       <Group title="Canvas">
+        {/* Which of the two windows this is.
+         *
+         * Fitting is the right default and the wrong only option: it makes a
+         * three-message mockup three messages tall, and gives you no way to
+         * ask for a picture at a size somebody else decided — a slide, a store
+         * listing, a row of mockups that have to line up. Set is that size,
+         * held, with the conversation against the bottom the way a half-empty
+         * channel sits in the client. */}
+        <Field
+          label="Window size"
+          hint={
+            fixed
+              ? "Held at the size below, whatever is in it. The conversation sits against the bottom, as it does in a channel with room to spare."
+              : "The window grows with the conversation and stops at the height below."
+          }
+        >
+          <Segmented
+            label="Window size"
+            value={fixed ? "fixed" : "fit"}
+            onChange={(v) => set("sizing", v)}
+            options={[
+              { value: "fit", label: "Fits the conversation" },
+              { value: "fixed", label: "Set size" },
+            ]}
+          />
+        </Field>
+
         {/* The phone's width is the phone's. Leaving the slider here would be
             a control that moves and changes nothing. */}
         {canvas.platform === "mobile" ? (
-          <Field label="Size" hint="The phone is drawn at 393 x 852, the iPhone viewport. Only the desktop canvas is resizable.">
+          <Field
+            label="Size"
+            hint={
+              fixed
+                ? "393 x 852, the iPhone viewport, held exactly."
+                : "393 wide, the iPhone viewport. Fitting, the screen grows past 852 with the conversation."
+            }
+          >
             <Text value="393 x 852" readOnly />
           </Field>
         ) : (
-          <Field label="Width">
-            <Slider value={canvas.width} min={320} max={1920} step={10} onChange={(v) => set("width", v)} suffix="px" />
-          </Field>
-        )}
-        {/* Where the window stops growing. Below it the frame hugs the
-            conversation; past it the conversation scrolls inside and this
-            edge is what the export stops at — so it is the single control
-            that decides how much of a long mockup ends up in the picture. */}
-        {canvas.platform === "mobile" ? null : (
-          <Field
-            label="Window height"
-            hint="A maximum, not a height. A short mockup stays short; a long one scrolls inside the window and exports at this edge."
-          >
-            <Slider
-              value={canvas.height ?? 760}
-              min={320}
-              max={1600}
-              step={10}
-              onChange={(v) => set("height", v)}
-              suffix="px"
-            />
-          </Field>
+          <>
+            <Field label="Width">
+              <Slider
+                value={canvas.width}
+                min={320}
+                max={1920}
+                step={10}
+                onChange={(v) => set("width", v)}
+                suffix="px"
+                typed
+                label="Width in pixels"
+              />
+            </Field>
+            <Field
+              label={fixed ? "Height" : "Window height"}
+              hint={
+                fixed
+                  ? "Exactly this tall. A short mockup keeps the empty room above it; a long one scrolls inside."
+                  : "A maximum, not a height. A short mockup stays short; a long one scrolls inside the window and exports at this edge."
+              }
+            >
+              <Slider
+                value={canvas.height ?? 760}
+                min={320}
+                max={1600}
+                step={10}
+                onChange={(v) => set("height", v)}
+                suffix="px"
+                typed
+                label="Height in pixels"
+              />
+            </Field>
+          </>
         )}
         {canvas.chrome === "none" ? (
           <Field label="Padding">

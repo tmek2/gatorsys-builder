@@ -112,6 +112,50 @@ textarea.e-control {
   text-align: right;
 }
 
+/* The same readout, typed into. It reads as the number it replaces until you
+   put the pointer on it, so a row of sliders does not become a row of boxes. */
+.e-slider-typed {
+  display: inline-flex;
+  align-items: baseline;
+  min-width: 48px;
+  color: var(--g-ink-dim);
+  font-size: 11.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.e-slider-field {
+  width: 36px;
+  padding: 2px 1px 2px 3px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.e-slider-field:hover {
+  border-color: var(--g-line);
+}
+.e-slider-field:focus {
+  border-color: var(--accent-peach);
+  background: var(--g-raise);
+  color: var(--g-ink);
+  outline: none;
+}
+/* The spinners are eight points of arrow on a thirty-eight point field, and
+   the slider beside it is the coarse control already. */
+.e-slider-field::-webkit-outer-spin-button,
+.e-slider-field::-webkit-inner-spin-button {
+  margin: 0;
+  appearance: none;
+}
+.e-slider-field {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
 /* A segmented control for three or four short options. Above that it is a
    select: six segments is a row of truncated words. */
 .e-segmented {
