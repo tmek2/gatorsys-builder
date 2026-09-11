@@ -879,3 +879,79 @@
 .c-panel {
   max-width: calc(100vw - 32px);
 }
+
+/* ------------------------------------------------------ the @ autocomplete */
+
+/* Discord's own way of making a mention: type an @, pick a person, and the
+   name goes in. Without it the only way to write one here was to know that
+   the text has to match a member's name exactly — which is a rule nobody can
+   see, and the reason "@alex" came out as grey prose. */
+.c-at {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 0;
+  z-index: 9;
+  width: min(320px, 100%);
+  max-height: 268px;
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  border: 1px solid var(--g-line);
+  border-radius: 14px;
+  background: var(--mac-pane-bg);
+  box-shadow: var(--mac-lift-high);
+  list-style: none;
+  animation: c-rise 160ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .c-at { animation: none; }
+}
+.c-at-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--g-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.c-at-row[data-on="true"] {
+  background: var(--g-fill-2);
+}
+.c-at-face {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.c-at-dot {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  margin: 6px;
+  border-radius: 50%;
+  background: var(--g-ink-faint);
+}
+.c-at-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.c-at-kind {
+  flex: none;
+  color: var(--g-ink-faint);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}

@@ -603,6 +603,43 @@ function AuthorPill({ project, author, onPick, onEdit, onAdd }) {
   );
 }
 
+/* Who an @ can name: the mockup's members, then its roles.
+ *
+ * This is Discord's own mechanism rather than a looser parser. In the client a
+ * plain `@alex` that you never picked off the autocomplete stays plain text —
+ * it is a mention because it names somebody who exists, not because it starts
+ * with an at sign — and the renderer here works the same way. Which left no
+ * way to make one: you had to know that the text must match a member's name
+ * exactly. This is the missing half. */
+function mentionable(project, query) {
+  const q = query.toLowerCase();
+  const rows = [
+    ...(project.users ?? []).map((u) => ({ id: u.id, name: u.name, avatar: u.avatar, role: false })),
+    ...(project.roles ?? []).map((r) => ({ id: r.id, name: r.name, color: r.color, role: true })),
+  ].filter((r) => r.name);
+  /* Starts-with before contains, the way the client ranks them: typing "al"
+     should offer Alex before Regional Manager. */
+  const starts = rows.filter((r) => r.name.toLowerCase().startsWith(q));
+  const holds = rows.filter((r) => !r.name.toLowerCase().startsWith(q) && r.name.toLowerCase().includes(q));
+  return [...starts, ...holds].slice(0, 8);
+}
+
+/* The @ being typed, if one is. Looks back from the caret to the nearest @
+   that opens a run with no newline in it — the same window the client's own
+   autocomplete watches. */
+function openAt(text, caret) {
+  const before = text.slice(0, caret);
+  const mark = before.lastIndexOf("@");
+  if (mark === -1) return null;
+  const query = before.slice(mark + 1);
+  if (/[\n@]/.test(query)) return null;
+  /* Two words is as far as it looks. Display names hold spaces, so a space
+     cannot end the query — but a whole sentence after an @ is somebody typing
+     prose, not choosing a person. */
+  if (query.split(" ").length > 3 || query.length > 40) return null;
+  return { mark, query };
+}
+
 export function Composer({
   project,
   author,
@@ -621,9 +658,39 @@ export function Composer({
   emojis,
 }) {
   const [draft, setDraft] = useState("");
+  /* The @ autocomplete's state: what was typed after the @, where that @ is in
+     the draft, and which row is under the keyboard. Null when it is closed. */
+  const [at, setAt] = useState(null);
+  const [atPick, setAtPick] = useState(0);
   const field = useRef(null);
   const island = useRef(null);
   const blob = useBlob(tool);
+
+  /* The list under the caret, and what happens when one of it is chosen.
+   *
+   * The name goes in as the name rather than as `<@id>`: a mockup has no
+   * snowflakes, and the renderer resolves a mention by matching the member
+   * list — so the text somebody reads in the field is the text the picture
+   * draws, which is the whole premise of editing a mockup. */
+  const rows = at ? mentionable(project, at.query) : [];
+
+  const takeMention = (row) => {
+    if (!row) return;
+    const after = draft.slice(field.current?.selectionStart ?? draft.length);
+    const next = `${draft.slice(0, at.mark)}@${row.name} ${after}`;
+    const caret = at.mark + row.name.length + 2;
+    setDraft(next);
+    setAt(null);
+    setAtPick(0);
+    /* After React has written the value, or the caret is placed in the old
+       one and jumps to the end on the next paint. */
+    window.requestAnimationFrame(() => {
+      const el = field.current;
+      if (!el) return;
+      el.focus();
+      el.setSelectionRange(caret, caret);
+    });
+  };
 
   /* The panel and the tray sit above the island, and the island is not a fixed
      height — the bar grows to what is being typed into it. Publishing the
@@ -688,16 +755,81 @@ export function Composer({
           value={draft}
           placeholder={`Message #${channel || "general"}`}
           aria-label="Write a message"
-          onChange={(e) => setDraft(e.target.value)}
+          role="combobox"
+          aria-expanded={Boolean(rows.length)}
+          aria-controls="c-at-list"
+          onChange={(event) => {
+            setDraft(event.target.value);
+            setAt(openAt(event.target.value, event.target.selectionStart));
+            setAtPick(0);
+          }}
+          onClick={(event) => setAt(openAt(event.target.value, event.target.selectionStart))}
+          onBlur={() => setAt(null)}
           /* Enter sends and shift-Enter breaks the line, which is the client's
              behaviour and the reason this reads as a chat rather than a form. */
           onKeyDown={(event) => {
+            /* While the list is up the arrows, Enter and Tab belong to it —
+               which is what they do in the client, and the reason Enter there
+               picks a person rather than sending half a sentence. */
+            if (rows.length) {
+              if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                event.preventDefault();
+                setAtPick((n) => (n + (event.key === "ArrowDown" ? 1 : rows.length - 1)) % rows.length);
+                return;
+              }
+              if (event.key === "Enter" || event.key === "Tab") {
+                event.preventDefault();
+                takeMention(rows[atPick]);
+                return;
+              }
+              if (event.key === "Escape") {
+                event.preventDefault();
+                event.stopPropagation();
+                setAt(null);
+                return;
+              }
+            }
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
               send();
             }
           }}
         />
+
+        {rows.length ? (
+          <ul className="c-at" id="c-at-list" role="listbox" aria-label="Mention">
+            {rows.map((row, i) => (
+              <li key={row.id}>
+                <button
+                  type="button"
+                  className="c-at-row"
+                  role="option"
+                  aria-selected={i === atPick}
+                  data-on={i === atPick ? "true" : "false"}
+                  onMouseEnter={() => setAtPick(i)}
+                  /* Before blur, or the field loses focus and closes the list
+                     out from under the click that was choosing from it. */
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    takeMention(row);
+                  }}
+                >
+                  {row.role ? (
+                    <span
+                      className="c-at-dot"
+                      style={row.color && row.color !== "none" ? { background: row.color } : undefined}
+                    />
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img className="c-at-face" src={row.avatar} alt="" />
+                  )}
+                  <span className="c-at-name">{row.name}</span>
+                  {row.role ? <span className="c-at-kind">role</span> : null}
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
 
         {/* Each does its own job, and the job is the thing it is a picture of.
             They all used to open the same panel — four buttons that were one
