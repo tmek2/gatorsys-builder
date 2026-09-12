@@ -78,10 +78,26 @@ export async function updateBackup(id, project) {
   return id;
 }
 
+/* Renames the backup, and the mockup inside it.
+ *
+ * The row's label and the project's own `name` are one name wearing two hats:
+ * this list draws the first and the editor's title bar reads the second. They
+ * were written separately, so renaming a row relabelled it and left the mockup
+ * inside still called what it was — and opening that backup handed the old
+ * name straight back to the title bar. */
 export async function renameBackup(id, name) {
-  const existing = await loadValue(`${NAMED}${id}`);
+  const key = `${NAMED}${id}`;
+  const existing = await loadValue(key).catch(() => null);
   if (!existing) return;
-  await saveValue(`${NAMED}${id}`, { ...existing, name: name || "Untitled mockup" });
+  const next = name || "Untitled mockup";
+  /* Nothing to do is nothing to write: this is reached from both ends — the
+     row and the title bar — and each would otherwise answer the other. */
+  if (existing.name === next && existing.project?.name === next) return;
+  await saveValue(key, {
+    ...existing,
+    name: next,
+    project: existing.project ? { ...existing.project, name: next } : existing.project,
+  });
 }
 
 export async function readBackup(id) {

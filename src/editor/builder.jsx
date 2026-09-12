@@ -62,7 +62,7 @@ import { nextStamp, restamp } from "@/lib/clock";
 import { TEMPLATES } from "@/lib/templates";
 import { SUPPORT_URL } from "@/lib/site";
 import { exchangeValue, loadValue, saveValue } from "@/lib/storage";
-import { saveBackup, updateBackup } from "@/lib/backups";
+import { renameBackup, saveBackup } from "@/lib/backups";
 import { TAB, announce, onAnnounce } from "@/lib/tabs";
 import { migrate, validProject } from "@/lib/validate";
 import { Hint, Pick } from "./fields";
@@ -148,6 +148,10 @@ export function Builder({ user, canSignIn = true, shared = null }) {
      is anything to redraw over. */
   const seen = useRef(0);
   const written = useRef(null);
+  /* Bumped whenever this mockup's name is written through to the backup it
+     belongs to, so the list redraws with it rather than waiting for whatever
+     happens next. */
+  const [renamed, setRenamed] = useState(0);
   /* Set when another tab has written the working copy and this one has changes
      of its own that would be lost by catching up. Saving here stops until it
      is answered, because a save at that point is the overwrite. */
@@ -408,6 +412,29 @@ export function Builder({ user, canSignIn = true, shared = null }) {
     }, 500);
     return () => window.clearTimeout(timer);
   }, [project, slug, linkedId, loaded, clash, adopt, nothingToLose, writeWorkingCopy, fail]);
+
+  /* The mockup's name and the name of the backup it belongs to are one name.
+   *
+   * The title bar renamed the document and left the row in Backups saying what
+   * it used to be called, so a list of backups ended up describing an earlier
+   * draft of each. Reported with the two side by side: the bar reading
+   * "Session after light" over a row still reading "Session before copy".
+   *
+   * The other direction was already here — renaming a row renames the mockup —
+   * and this is its other half. Debounced, because the title bar is a text
+   * field and every letter of a new name is a commit. */
+  useEffect(() => {
+    if (!loaded || !linkedId) return undefined;
+    const timer = window.setTimeout(() => {
+      renameBackup(linkedId, project.name)
+        .then(() => setRenamed((n) => n + 1))
+        .catch(() => {
+          /* A backup that cannot be written is not worth interrupting a
+             rename over; the next save says so anyway. */
+        });
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [project.name, linkedId, loaded]);
 
   /* Another tab wrote. Bound once, for the life of the editor.
    *
@@ -1312,39 +1339,30 @@ export function Builder({ user, canSignIn = true, shared = null }) {
 
   /* Everything that replaces what is on the canvas goes through here.
    *
-   * New mockup, a template, the empty tile: each throws the working copy away,
-   * and the working copy is where everything typed since the last Save lives.
-   * Being linked to a backup used to count as already kept, which is only true
-   * of the last Save — so "new" quietly deleted whatever came after it. A link
-   * says which backup this is, not that it is current, so the link is written
-   * to rather than trusted.
+   * It used to keep the working copy first, as a backup, so that nothing was
+   * ever thrown away by a press of New. That turned the list into a diary
+   * nobody asked for: click through five templates to see what they look like
+   * and you have five backups named after them. Reported in those words — "why
+   * do the templates save automatically?? only if the user creates a backup is
+   * it a backup, otherwise just browser".
    *
-   * And if it cannot be written, nothing is replaced. A blank page is not
-   * worth the thing it would be written over. */
+   * Which is the right model, and the one the rest of this editor already
+   * follows. The browser holds the working copy and writes it on every change.
+   * A backup is a copy you decide to make. And this boundary is undoable —
+   * opening a template and pressing ctrl+Z gives back what was there — so
+   * there is nothing here that needs rescuing into a row.
+   *
+   * The exception is the mockup this working copy belongs to, if it belongs to
+   * one: that backup is not written either. Save is where a person says which
+   * version of their own document to keep, and a template press is not that. */
   const startFresh = useCallback(
-    async (next, said) => {
-      const was = project.name;
-      /* Nothing there is nothing to keep: backing up the page the editor opens
-         on would put an "Untitled mockup" in the list every time somebody
-         pressed New. */
-      const blank = untouched(project);
-      if (!blank) {
-        const kept = await (linkedId ? updateBackup(linkedId, project) : saveBackup(project))
-          .then(() => true)
-          .catch(() => false);
-        if (!kept) {
-          fail(
-            `\u201c${was}\u201d could not be backed up, so it is still here. Download the project file before starting something new.`,
-          );
-          return;
-        }
-      }
+    (next, said) => {
       load(next, ID.mockup());
       setLinkedId(null);
       setSheetOpen(null);
-      notify(blank ? said : `${said} \u201c${was}\u201d is in Backups.`);
+      notify(said);
     },
-    [fail, linkedId, load, notify, project],
+    [load, notify],
   );
 
   /* A blank page to start again on.
@@ -2258,6 +2276,7 @@ export function Builder({ user, canSignIn = true, shared = null }) {
           linkedId={linkedId}
           onLink={setLinkedId}
           onRenameProject={(name) => commit((p) => ({ ...p, name }))}
+          revision={renamed}
           user={user}
           canSignIn={canSignIn}
           savedLocally={savedLocally}

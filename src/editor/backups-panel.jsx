@@ -39,7 +39,6 @@ import {
   saveBackup,
   updateBackup,
 } from "@/lib/backups";
-import { untouched } from "@/lib/model";
 import { ID } from "@/lib/ids";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Input } from "@/components/ui/input";
@@ -186,7 +185,7 @@ function BackupRow({ row, busy, onOpen, onRename, onDuplicate, onDelete, icon })
   );
 }
 
-export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink, onLoad, onRenameProject, onError, onNotify, savedLocally }) {
+export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink, onLoad, onRenameProject, onError, onNotify, savedLocally, revision = 0 }) {
   const [rows, setRows] = useState(null);
   const [cloud, setCloud] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -226,9 +225,13 @@ export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink,
     }
   }, [onError, user]);
 
+  /* `revision` counts the times the editor has written this mockup's name
+     through to its backup. Without it the row keeps the old name until the
+     next save happens to come round, which is a list disagreeing with the
+     title bar above it for as long as nobody types. */
   useEffect(() => {
     refreshLocal();
-  }, [refreshLocal, savedLocally]);
+  }, [refreshLocal, savedLocally, revision]);
 
   useEffect(() => {
     refreshCloud();
@@ -253,36 +256,20 @@ export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink,
     }
   };
 
-  /* Whatever is on screen is about to be replaced, so it goes somewhere first.
+  /* Nothing in here writes a backup you did not ask for.
    *
-   * The working copy is where everything typed since the last Save lives, and
-   * three controls in this panel swap it out. Losing an afternoon to a click
-   * on another row is the complaint this panel exists to answer, so: into the
-   * backup it belongs to, or into one of its own if it belongs to none. The
-   * blank page is the exception — see `untouched`. */
-  const keepWorkingCopy = async () => {
-    if (untouched(project)) return;
-    if (linkedId) await updateBackup(linkedId, project);
-    else await saveBackup(project);
-  };
-
+   * Opening one used to keep whatever was on the canvas first, so that no
+   * click could cost you an afternoon. It also meant a list that filled with
+   * rows nobody made — reported as "why does any change save to backup, only
+   * if the user creates a backup is it a backup, otherwise just browser".
+   * Which is right: the browser holds the working copy and writes it on every
+   * change, a backup is a copy somebody decides to keep, and opening one is
+   * undoable like every other change to the canvas. */
   const open = async (id) => {
     const restored = await readBackup(id).catch(() => null);
     if (!restored) {
       onError("That backup could not be read.");
       return;
-    }
-    /* Opening the backup you are already on is going back to what it holds —
-       a deliberate discard of what you have done since. Writing the working
-       copy into it first would hand you your own changes back and make the
-       control do nothing. */
-    if (id !== linkedId) {
-      try {
-        await keepWorkingCopy();
-      } catch {
-        onError("Could not keep the mockup you have open, so it was not replaced.");
-        return;
-      }
     }
     onLoad(restored);
     /* Opening a named backup links to it, so the next Save updates the thing
@@ -338,9 +325,6 @@ export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink,
       const res = await fetch(`/api/mockups/${id}`, { cache: "no-store" });
       if (!res.ok) throw new Error();
       const data = await res.json();
-      /* Same rule as a local row: what is on screen is kept before it is
-         replaced. See `keepWorkingCopy`. */
-      await keepWorkingCopy();
       onLoad(data.project, data.slug);
       onNotify(`Opened “${data.name}”.`);
     } catch {
@@ -410,10 +394,6 @@ export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink,
 
     setBusy(true);
     try {
-      /* The working copy is about to be replaced, so it goes somewhere first:
-         into the backup it belongs to, or into one of its own if it belongs to
-         none. Nothing here is ever the last copy of something. */
-      if (!mine) await keepWorkingCopy();
       const name = freeName(row.name);
       const id = await saveBackup(source, name);
       const copy = await readBackup(id);
