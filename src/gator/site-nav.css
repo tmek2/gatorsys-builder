@@ -95,7 +95,7 @@
 .g-nav-blob-skin {
   position: absolute;
   inset: 0;
-  border-radius: var(--g-r-pill);
+  border-radius: var(--g-r-control);
   background: var(--g-fill-2);
   transition: transform 200ms var(--g-ease-out);
 }
@@ -110,7 +110,7 @@
   align-items: center;
   gap: 7px;
   padding: 8px 12px;
-  border-radius: var(--g-r-pill);
+  border-radius: var(--g-r-control);
   font-size: 14px;
   font-weight: 600;
   color: var(--g-ink-dim);
@@ -142,7 +142,7 @@
   align-items: center;
   gap: 9px;
   padding: 5px 14px 5px 5px;
-  border-radius: var(--g-r-pill);
+  border-radius: var(--g-r-control);
   border: 1px solid var(--g-line-strong);
   background: var(--g-fill-2);
   color: var(--g-ink);
@@ -172,7 +172,7 @@
   gap: 7px;
   flex: none;
   padding: 8px 16px;
-  border-radius: var(--g-r-pill);
+  border-radius: var(--g-r-control);
   border: 1px solid var(--g-line-strong);
   background: var(--g-fill-2);
   color: var(--g-ink);

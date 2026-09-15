@@ -108,7 +108,7 @@
   flex: none;
   padding: 4px 9px;
   border: 1px solid transparent;
-  border-radius: 999px;
+  border-radius: var(--g-r-control);
   background: transparent;
   color: var(--g-ink-faint);
   font: inherit;
@@ -184,7 +184,7 @@
   display: inline-flex;
   gap: 2px;
   padding: 2px;
-  border-radius: var(--g-r-pill);
+  border-radius: var(--g-r-control);
   background: var(--g-fill-2);
 }
 .e-stage-seg {
@@ -194,7 +194,7 @@
   height: 28px;
   padding: 0 11px;
   border: 0;
-  border-radius: var(--g-r-pill);
+  border-radius: var(--g-r-inset);
   background: transparent;
   color: var(--g-ink-faint);
   font: inherit;
@@ -565,7 +565,7 @@
   min-width: 52px;
   padding: 4px 8px;
   border: 1px solid var(--g-line);
-  border-radius: var(--g-r-pill);
+  border-radius: var(--g-r-control);
   background: var(--g-fill);
   color: var(--g-ink-dim);
   font: inherit;
@@ -1085,7 +1085,7 @@
   max-width: min(520px, calc(100vw - 32px));
   padding: 11px 16px;
   border: 1px solid var(--mac-hairline);
-  border-radius: var(--g-r-pill);
+  border-radius: var(--g-r-bar);
   background: var(--g-sheet-ground);
   box-shadow: var(--mac-lift-high);
   color: var(--g-ink);

@@ -70,11 +70,19 @@ export async function saveBackup(project, name) {
   return id;
 }
 
-/** Overwrite an existing backup in place, keeping its id and its position. */
+/** Overwrite an existing backup in place, keeping its id and its position.
+ *
+ * Never creates one. It used to make a new backup when the id had gone, which
+ * was harmless while this was only reached from a Save button and is not now
+ * that the editor writes through to the backup it belongs to as you type: a
+ * link left pointing at a deleted row would quietly put that row back, once
+ * per keystroke. Missing means missing, and the caller decides what that is
+ * worth. */
 export async function updateBackup(id, project) {
-  const existing = await loadValue(`${NAMED}${id}`).catch(() => null);
-  if (!existing) return saveBackup(project);
-  await saveValue(`${NAMED}${id}`, entry(id, project, { auto: false, name: existing.name }));
+  const key = `${NAMED}${id}`;
+  const existing = await loadValue(key).catch(() => null);
+  if (!existing) return null;
+  await saveValue(key, entry(id, project, { auto: false, name: existing.name }));
   return id;
 }
 

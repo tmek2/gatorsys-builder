@@ -501,7 +501,7 @@
   height: 36px;
   padding: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--g-r-inset);
   background: transparent;
   color: var(--g-ink-dim);
   cursor: pointer;

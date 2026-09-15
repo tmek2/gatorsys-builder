@@ -316,6 +316,21 @@
   }
 }
 
+/* The row you are in is not a button.
+ *
+ * Disabled, because opening the mockup you already have open is a press with
+ * nothing on the other side of it — but not greyed out: this is the row the
+ * eye is looking for, and dimming the one that matters most to find the
+ * wrong way round. It keeps its colour and drops the pointer. */
+.b-open:disabled {
+  cursor: default;
+  opacity: 1;
+}
+.b-row[data-current="true"] .b-open-hint {
+  font-style: italic;
+  font-weight: 600;
+}
+
 /* ------------------------------------------------- the flattened panel */
 
 /* One list, not three boxes. The sections said where the bytes were kept,

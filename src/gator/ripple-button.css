@@ -10,7 +10,7 @@
   gap: 9px;
   overflow: hidden;
   border: 0;
-  border-radius: var(--g-r-pill);
+  border-radius: var(--g-r-control);
   font: inherit;
   font-weight: 700;
   letter-spacing: -0.005em;

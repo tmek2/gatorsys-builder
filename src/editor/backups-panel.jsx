@@ -20,7 +20,6 @@ import {
   IconCloudOff,
   IconArrowBackUp,
   IconCopy,
-  IconDeviceFloppy,
   IconDownload,
   IconFileText,
   IconPlus,
@@ -37,7 +36,6 @@ import {
   readBackup,
   renameBackup,
   saveBackup,
-  updateBackup,
 } from "@/lib/backups";
 import { ID } from "@/lib/ids";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -132,7 +130,23 @@ function BackupRow({ row, busy, onOpen, onRename, onDuplicate, onDelete, icon })
 
   return (
     <li className="b-row" data-current={row.current ? "true" : "false"}>
-      <button type="button" className="b-open" onClick={onOpen} disabled={busy}>
+      {/* The one you are in does not open.
+       *
+       * It offered "Open again", which read as a way back to how it was and
+       * was a way to lose an afternoon: it replaced the canvas with what had
+       * been written last, and everything since went with it. Reported as "if
+       * i edit a backup then reopen that backup while still editing it all
+       * progress is gone, shouldn't even be able to open backups i'm already
+       * on." Quite so — and now that this backup keeps itself as you type,
+       * there is nothing on the other side of that press but the same mockup.
+       * Undo is the way back to how it was. */}
+      <button
+        type="button"
+        className="b-open"
+        onClick={onOpen}
+        disabled={busy || row.current}
+        aria-current={row.current ? "true" : undefined}
+      >
         <span className="b-name">
           {icon}
           {row.name}
@@ -144,8 +158,14 @@ function BackupRow({ row, busy, onOpen, onRename, onDuplicate, onDelete, icon })
         {/* The whole row opens the backup, which is not something anybody
             guesses from a row. It says so when you point at it. */}
         <span className="b-open-hint">
-          {row.current ? "Open again" : "Open"}
-          <IconArrowBackUp size={13} />
+          {row.current ? (
+            "You are editing this one"
+          ) : (
+            <>
+              Open
+              <IconArrowBackUp size={13} />
+            </>
+          )}
         </span>
       </button>
       {onRename ? (
@@ -239,23 +259,6 @@ export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
 
-  const makeBackup = async () => {
-    setBusy(true);
-    try {
-      /* And link to it. A backup this working copy is not attached to is a
-         backup the next Save cannot land on, so every Save after this one
-         would make another row instead of updating this one. */
-      const id = await saveBackup(project);
-      onLink?.(id);
-      onNotify(`“${project.name}” backed up in this browser.`);
-      refreshLocal();
-    } catch {
-      onError("Could not write the backup. Browser storage may be full.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   /* Nothing in here writes a backup you did not ask for.
    *
    * Opening one used to keep whatever was on the canvas first, so that no
@@ -339,23 +342,6 @@ export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink,
       refreshCloud();
     } catch {
       onError("That backup could not be deleted.");
-    }
-  };
-
-  /* Saving a linked mockup updates the backup it belongs to. Without the link
-     every save made another copy, so a person working on one mockup ended up
-     with fourteen of it and no way to tell which was current. */
-  const saveLinked = async () => {
-    if (!linked) return makeBackup();
-    setBusy(true);
-    try {
-      await updateBackup(linked.id, project);
-      onNotify(`\u201c${linked.name}\u201d updated.`);
-      refreshLocal();
-    } catch {
-      onError("Could not write the backup. Browser storage may be full.");
-    } finally {
-      setBusy(false);
     }
   };
 
@@ -483,14 +469,18 @@ export function BackupsPanel({ project, slug, user, canSignIn, linkedId, onLink,
                 }}
               />
             )}
+            {/* No Save button.
+                There was one, and everything typed between presses of it sat
+                in the working copy and nowhere else — a backup made once and
+                then left behind by the mockup it was a backup of. Naming a
+                mockup is what turns it from a scratch page into a document,
+                and a document keeps itself, so this says what is true rather
+                than offering to make it true. */}
             <em data-saved={savedLocally ? "true" : "false"}>
-              {savedLocally ? `Saved ${when(linked.savedAt)}` : "Saving\u2026"}
+              {savedLocally ? `Kept here, saved ${when(linked.savedAt)}` : "Saving\u2026"}
             </em>
           </span>
           <span className="b-linked-actions">
-            <button type="button" className="e-btn e-btn-solid" onClick={saveLinked} disabled={busy}>
-              <IconDeviceFloppy size={14} /> Save
-            </button>
             <Tooltip>
               <TooltipTrigger asChild>
                 <button type="button" className="e-btn e-btn-quiet" onClick={() => onLink?.(null)}>

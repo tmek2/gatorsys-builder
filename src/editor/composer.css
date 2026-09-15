@@ -38,7 +38,7 @@
   height: 46px;
   padding: 0 12px 0 8px;
   border: 1px solid var(--g-line);
-  border-radius: 999px;
+  border-radius: var(--g-r-control);
   background: var(--mac-pane-bg);
   box-shadow: var(--mac-lift);
   color: var(--g-ink);
@@ -194,7 +194,7 @@
   min-height: 46px;
   padding: 6px 10px;
   border: 1px solid var(--g-line);
-  border-radius: 22px;
+  border-radius: var(--g-r-bar);
   background: var(--mac-pane-bg);
   box-shadow: var(--mac-lift);
   transition: border-color 140ms ease;
@@ -259,7 +259,7 @@
   height: 46px;
   padding: 5px;
   border: 1px solid var(--g-line);
-  border-radius: 999px;
+  border-radius: var(--g-r-bar);
   background: var(--mac-pane-bg);
   box-shadow: var(--mac-lift);
 }
@@ -272,7 +272,7 @@
   height: 34px;
   padding: 0 12px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--g-r-inset);
   background: transparent;
   color: var(--g-ink-dim);
   font: inherit;
@@ -468,7 +468,7 @@
   height: 30px;
   padding: 0 12px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--g-r-control);
   background: transparent;
   color: var(--g-ink-dim);
   font: inherit;

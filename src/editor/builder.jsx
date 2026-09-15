@@ -62,7 +62,7 @@ import { nextStamp, restamp } from "@/lib/clock";
 import { TEMPLATES } from "@/lib/templates";
 import { SUPPORT_URL } from "@/lib/site";
 import { exchangeValue, loadValue, saveValue } from "@/lib/storage";
-import { renameBackup, saveBackup } from "@/lib/backups";
+import { renameBackup, saveBackup, updateBackup } from "@/lib/backups";
 import { TAB, announce, onAnnounce } from "@/lib/tabs";
 import { migrate, validProject } from "@/lib/validate";
 import { Hint, Pick } from "./fields";
@@ -395,6 +395,17 @@ export function Builder({ user, canSignIn = true, shared = null }) {
       writeWorkingCopy({ project, slug, linkedId })
         .then(async (lost) => {
           if (!lost) {
+            /* And into the backup this mockup belongs to, if it belongs to
+               one.
+               A backup used to be a photograph: made once, and left behind by
+               everything typed after it until somebody pressed Save. Asked
+               about in exactly those terms — "if i type in here why doesn't
+               the edit save as a backup if i just created a name for it" —
+               and the answer is that it should. Naming a mockup is what turns
+               it from a scratch page into a document, and a document keeps
+               itself. The browser's working copy is still the thing that
+               survives a reload without any of this. */
+            if (linkedId) await updateBackup(linkedId, project).catch(() => null);
             setSavedLocally(true);
             return;
           }
@@ -1494,8 +1505,26 @@ export function Builder({ user, canSignIn = true, shared = null }) {
            opened from inside a sheet closes itself on Escape, and taking the
            sheet down in the same press is two dismissals for one key. */
         if (floatingLayerOpen()) return;
-        setPaletteOpen(false);
-        setSheetOpen(null);
+        /* One press, one thing, innermost first.
+         *
+         * It closed the palette and the sheet and left the tray and the panel
+         * where they were, so Escape worked on two of the four things this
+         * editor opens over the canvas and did nothing on the other two — and
+         * a key that works most of the time is worse than one that never does,
+         * because you stop watching to see whether it did. */
+        if (paletteOpen) {
+          setPaletteOpen(false);
+          return;
+        }
+        if (sheetOpen) {
+          setSheetOpen(null);
+          return;
+        }
+        if (trayOpen || panelOpen) {
+          setTrayOpen(false);
+          setPanelOpen(false);
+          return;
+        }
         return;
       }
       /* The zoom shortcuts every canvas has. `=` because that is the key the
@@ -1532,10 +1561,38 @@ export function Builder({ user, canSignIn = true, shared = null }) {
         event.preventDefault();
         addMessage();
       }
+      /* And Delete takes one out.
+       *
+       * There was a shortcut for duplicating a message and none for removing
+       * one, so the only way back out of a message was the small bin in the
+       * strip that appears over it on hover: findable, and not where a hand
+       * goes. Both keys, because half the keyboards in the world print the
+       * other one. Guarded by `typing` above, so they still delete characters
+       * in every field, and by a selection, so a stray press on the stage does
+       * nothing. Undo covers the press somebody did not mean. */
+      if ((event.key === "Delete" || event.key === "Backspace") && message) {
+        event.preventDefault();
+        removeMessage();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [addMessage, duplicateMessage, redo, setZoom, undo]);
+    /* The four open-state flags are in here because Escape now closes the
+       innermost of them, and a handler bound once would be deciding that from
+       whatever they were when the editor first painted. */
+  }, [
+    addMessage,
+    duplicateMessage,
+    removeMessage,
+    message,
+    redo,
+    setZoom,
+    undo,
+    paletteOpen,
+    sheetOpen,
+    trayOpen,
+    panelOpen,
+  ]);
 
   /* ------------------------------------------------------------- render */
 
@@ -1549,6 +1606,7 @@ export function Builder({ user, canSignIn = true, shared = null }) {
         type="file"
         accept="application/json,.json"
         className="e-file-hidden"
+        aria-label="Open a mockup file"
         aria-hidden="true"
         tabIndex={-1}
         onChange={importFile}

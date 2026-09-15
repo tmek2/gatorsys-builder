@@ -81,10 +81,23 @@
   --mac-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.14), 0 28px 80px rgba(0, 0, 0, 0.62),
     0 6px 20px rgba(0, 0, 0, 0.4);
 
-  /* One radius system: interactive is a pill, containers are 16, insets 10. */
+  /* One radius system, the site's own.
+   *
+   * A pill is still a pill where a pill is the right shape — a status chip, a
+   * count, a person's face, the track of a slider — and it is not the right
+   * shape for a button, a header, a tab or a field. Those were all
+   * `--g-r-pill` here, and the whole editor came out as a row of capsules.
+   *
+   * A card is 12 and an inset inside it is 8, so an inner curve follows the
+   * outer one down rather than repeating it. Both were a step larger, which is
+   * what made every panel read as one big rounded box with more rounded boxes
+   * inside it at the same radius. */
   --g-r-pill: 999px;
-  --g-r-container: 16px;
-  --g-r-inset: 10px;
+  --g-r-container: 12px;
+  --g-r-inset: 8px;
+  /* The chrome's own two: a bar, and a control set into one. */
+  --g-r-bar: 12px;
+  --g-r-control: 9px;
 
   --g-fast: 120ms;
   --g-med: 240ms;

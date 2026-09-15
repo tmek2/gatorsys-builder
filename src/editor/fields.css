@@ -162,7 +162,7 @@ textarea.e-control {
   display: inline-flex;
   padding: 2px;
   border: 1px solid var(--g-line);
-  border-radius: var(--g-r-pill);
+  border-radius: var(--g-r-control);
   background: var(--g-fill);
 }
 .e-segment {
@@ -173,7 +173,7 @@ textarea.e-control {
   flex: 1;
   padding: 5px 11px;
   border: 0;
-  border-radius: var(--g-r-pill);
+  border-radius: var(--g-r-inset);
   background: transparent;
   color: var(--g-ink-faint);
   font: inherit;
